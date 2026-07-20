@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.3.3
+- All frame-touching setup (hooks, skinning, backdrop probing) is deferred from ADDON_LOADED to PLAYER_ENTERING_WORLD. At /reload time, ADDON_LOADED fires while the client is still rebuilding its UI; touching Blizzard frames that early is a plausible trigger for hard client crashes (Error #132) on fragile custom clients. ADDON_LOADED now runs pure Lua only.
+
+## 2.3.2
+- Hardened against a client crash on /reload reported with font addons: every SetFont call now guards against GetFont() returning nil (SetFont(nil, ...) is a known 3.3.5 client crash).
+- Frame scale is clamped to a sane range (guards against SetScale(0) from a corrupted saved value).
+
 ## 2.3.1
 - Fixed: re-enabling "Show roll winners recap" while `/cll test` is open now brings the recap preview back immediately.
 

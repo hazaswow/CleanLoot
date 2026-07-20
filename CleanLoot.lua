@@ -471,7 +471,13 @@ local function SkinButton(button, label, iconPath)
     if label and not button.__label then
         local fs = button:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         fs:SetPoint("CENTER")
-        fs:SetFont(fs:GetFont(), 9, "")
+        local labelFont = fs:GetFont()
+        if labelFont then
+            -- SetFont(nil, ...) is a known client crash on 3.3.5; GetFont()
+            -- can return nil at /reload time if a font addon has not
+            -- reapplied its fonts yet.
+            fs:SetFont(labelFont, 9, "")
+        end
         fs:SetText(label)
         button.__label = fs
     end
@@ -760,7 +766,9 @@ local function SkinLootFrame(frame)
     local nameFS = _G[frameName.."Name"] or _G[frameName.."ItemName"]
     if nameFS then
         local font = nameFS:GetFont()
-        nameFS:SetFont(font, currentSkin.fontSize, "OUTLINE")
+        if font then
+            nameFS:SetFont(font, currentSkin.fontSize, "OUTLINE")
+        end
         if not frame.__origNameSize then
             frame.__origNameSize = { nameFS:GetWidth(), nameFS:GetHeight() }
         end
@@ -863,7 +871,9 @@ local function ApplySkin(name)
         end
         if frame.__nameFS then
             local font = frame.__nameFS:GetFont()
-            frame.__nameFS:SetFont(font, currentSkin.fontSize, "OUTLINE")
+            if font then
+                frame.__nameFS:SetFont(font, currentSkin.fontSize, "OUTLINE")
+            end
         end
         ApplyFrameLayout(frame)
         UpdateCornerVisibility(frame, frame.__lastQuality)
@@ -951,7 +961,13 @@ end)
 -- proportions. Stacks with the global UI Scale (default options or ElvUI),
 -- which these frames already inherit through UIParent.
 local function ApplyFrameScale()
-    local s = CleanLootDB.frameScale or 1
+    local s = tonumber(CleanLootDB.frameScale) or 1
+    -- SetScale(0) can crash the client; clamp to a sane range and repair
+    -- any corrupted saved value.
+    if s < 0.5 or s > 2 then
+        s = 1
+        CleanLootDB.frameScale = 1
+    end
     for i = 1, 4 do
         local f = _G["GroupLootFrame"..i]
         if f then
@@ -1144,7 +1160,9 @@ RefreshTestFrameSkin = function()
 
     if testFrame.__nameFS then
         local font = testFrame.__nameFS:GetFont()
-        testFrame.__nameFS:SetFont(font, currentSkin.fontSize, "OUTLINE")
+        if font then
+            testFrame.__nameFS:SetFont(font, currentSkin.fontSize, "OUTLINE")
+        end
     end
 
     ApplyTestFrameLayout()
@@ -1818,10 +1836,37 @@ end
 local watcher = CreateFrame("Frame")
 watcher:RegisterEvent("ADDON_LOADED")
 watcher:RegisterEvent("PLAYER_LOGIN")
+watcher:RegisterEvent("PLAYER_ENTERING_WORLD")
 watcher:RegisterEvent("START_LOOT_ROLL")
+
+-- Frame-touching setup runs once per UI session, on PLAYER_ENTERING_WORLD
+-- rather than ADDON_LOADED. At /reload time, ADDON_LOADED fires very early
+-- while the (custom) client is still rebuilding its UI; hooking, skinning
+-- and backdrop-probing Blizzard frames at that exact moment is a plausible
+-- trigger for hard client crashes (Error #132) on fragile clients. PEW
+-- fires once everything is fully stable, and no loot roll can possibly
+-- happen before then.
+local coreInitialized = false
+
+local function InitializeCore()
+    if coreInitialized then return end
+    coreInitialized = true
+
+    ApplyDeleteConfirmOverride()
+    SetupAutoConfirm()
+
+    for i = 1, 4 do
+        EnsureFrameHooked(_G["GroupLootFrame"..i])
+    end
+
+    ApplyFrameScale()
+    ApplyLayout()
+end
 
 watcher:SetScript("OnEvent", function(self, event, arg1)
     if event == "ADDON_LOADED" and arg1 == ADDON_NAME then
+        -- Pure Lua only here (defaults + skin table): zero frame API calls
+        -- during the early, fragile phase of a UI (re)load.
         CleanLootDB.growDirection = CleanLootDB.growDirection or "DOWN"
         CleanLootDB.skin = CleanLootDB.skin or "classic"
         if CleanLootDB.noConfirm == nil then CleanLootDB.noConfirm = false end
@@ -1830,20 +1875,13 @@ watcher:SetScript("OnEvent", function(self, event, arg1)
         if CleanLootDB.winRecap == nil then CleanLootDB.winRecap = true end
         if CleanLootDB.frameScale == nil then CleanLootDB.frameScale = 1 end
         CopySkin(CleanLootDB.skin)
-        ApplyDeleteConfirmOverride()
-        SetupAutoConfirm()
-
-        for i = 1, 4 do
-            EnsureFrameHooked(_G["GroupLootFrame"..i])
-        end
-
-        ApplyFrameScale()
-        ApplyLayout()
-        EnsureLootSpamCVar()
+    elseif event == "PLAYER_ENTERING_WORLD" then
+        InitializeCore()
     elseif event == "PLAYER_LOGIN" then
         -- Some CVars are only reliably readable at login time.
         EnsureLootSpamCVar()
     elseif event == "START_LOOT_ROLL" then
+        InitializeCore()
         -- Guaranteed catch-up: the frames necessarily exist at this point, and
         -- any previously failed skin is retried here.
         for i = 1, 4 do

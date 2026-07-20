@@ -1,6 +1,6 @@
 # CleanLoot
 
-A lightweight, standalone reskin of the group loot roll frames (Need/Greed/Disenchant/Pass) for **WoW 3.3.5**, built and tested on **Ascension (Conquest of Azeroth)**.
+A lightweight, standalone reskin of the group loot roll frames (Need/Greed/Disenchant/Pass) for **WoW 3.3.5**, built and tested on **Ascension (Conquest of Azeroth)**. **No ElvUI required.**
 
 ## Features
 
