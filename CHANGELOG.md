@@ -1,5 +1,25 @@
 # Changelog
 
+## 3.3.0
+Major update. The addon no longer reskins Blizzard's loot roll frames — it now renders its own, which eliminates a whole class of native-frame glitches.
+
+**New architecture**
+- Replacement frames: the native GroupLootFrames are hidden and the addon draws its own frames on top (fed by the game's roll info, rolling through the standard API). This removes the native gold backdrop bleeding through, double timer bars, recreated button textures, and desynced button hitboxes for good.
+
+**New features**
+- Roll winners recap: a small movable window lists who won each item, with the roll type icon (Need/Greed/Disenchant) and the winning roll value.
+- Session roll history (`/cll history` or the History button): every item rolled this session, with the winner, type and value, and each item's rolls expandable per line (click to unfold). Session-only, capped at 100 entries.
+- Correct winning-tier logic: any Need beats Greed/Disenchant; Greed and Disenchant share a tier (highest roll wins); otherwise everyone passed.
+- Need / Greed / Disenchant buttons now gray out when unavailable, read from the client's real per-button state (so Disenchant correctly greys when nobody in the group can disenchant, independently of the other buttons).
+- Item interaction on the roll frame icon: hover for the tooltip, Shift-hover to compare, Ctrl+left-click to preview the appearance (dressing room), Shift+left-click to link in chat.
+- Option to hide roll messages from the chat window (the recap and tooltips still receive the data).
+- Icon zoom to crop the ugly rounded border, thin quality-colored borders, deeper purple for epics, unified font across all windows.
+
+**Fixes**
+- Both skins no longer break when an ElvUI fork is loaded (native SetBackdrop is tried before any backported mixin).
+- Recap/history capture reworked to be keyed by item name, robust to this server's unreliable roll IDs.
+- Numerous compact-skin cleanups (no stray boxes, single timer bar, transparent buttons with a thin delimiter border).
+
 ## 2.3.3
 - All frame-touching setup (hooks, skinning, backdrop probing) is deferred from ADDON_LOADED to PLAYER_ENTERING_WORLD. At /reload time, ADDON_LOADED fires while the client is still rebuilding its UI; touching Blizzard frames that early is a plausible trigger for hard client crashes (Error #132) on fragile custom clients. ADDON_LOADED now runs pure Lua only.
 

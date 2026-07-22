@@ -4,14 +4,19 @@ A lightweight, standalone reskin of the group loot roll frames (Need/Greed/Disen
 
 ## Features
 
-- Two visual styles: **Improved Classic** (cleaned-up native look) or **ElvUI-inspired compact**
+- Renders its **own** loot roll frames on top of the hidden native ones — no native glitches (gold backdrop, double bars, stuck buttons)
+- Two visual styles: **Improved Classic** (clean dark look) or **ElvUI-inspired compact**
 - **Movable** and **scalable** frames (scale slider in options)
 - Stack direction of your choice (upward or downward); items collapse neatly when a roll resolves
 - Border and item name **colored by item quality**; roll timer fades **yellow → red**
-- Hover the roll buttons to see **who rolled what** in your group, with a counter
-- Optional **roll winners recap** window (hover a line for the full item tooltip)
+- **Need/Greed/Disenchant buttons gray out** when unavailable (Disenchant is group-aware), independently of each other
+- **Icon interaction**: hover for tooltip, Shift-hover to compare, **Ctrl+left-click** to preview the appearance, **Shift+left-click** to link in chat
+- Hover the roll buttons to see **who rolled what** in your group
+- **Roll winners recap** window with roll type icon and winning value
+- **Session roll history** (`/cll history`): items, winners, type and value, with per-item expandable rolls
 - Optional **confirmation popup skipping** (BoP rolls, BoP loot)
 - Optional **simple Delete confirmation** (Yes/No instead of typing "DELETE")
+- Optional **hide roll messages** from the chat window
 - Automatic **EN/FR localization** based on the client language
 
 ## Installation
@@ -28,6 +33,7 @@ A lightweight, standalone reskin of the group loot roll frames (Need/Greed/Disen
 | `/cll test` | Show dummy frames to preview the skin and reposition everything (drag with left click) + open options |
 | `/cll stop` | Close test mode and save positions |
 | `/cll options` | Open the options panel only |
+| `/cll history` | Open the session roll history window |
 | `/cll reset` | Reset positions to default |
 | `/cll debugmode` | Toggle diagnostic messages (turn on before reporting a bug, then share a chat screenshot) |
 | `/cll debug` | Diagnose the loot frames on this client |

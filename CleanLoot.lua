@@ -27,6 +27,13 @@ local LOCALES = {
         OPT_SIMPLE_DEL   = "Simple Delete confirmation",
         OPT_WIN_RECAP    = "Show roll winners recap",
         OPT_SCALE        = "Frame scale",
+        OPT_HIDE_SPAM    = "Hide roll messages from chat",
+        HIST_TITLE       = "Roll history",
+        HIST_EMPTY       = "No rolls recorded this session",
+        OPT_DETAIL_WINS  = "Detailed roll winners",
+        HIST_BTN         = "History",
+        HELP_HISTORY     = "  /cll history   - open the roll history window",
+        EVERYONE_PASSED  = "everyone passed",
         MSG_LOOTSPAM_ON  = "the '%s' interface option was enabled (required for the winners recap and the roll tooltips).",
         WINS_TITLE       = "Roll winners",
         MSG_TEST_OPEN    = "test mode + options opened. Drag the window with left click, type /cll stop when done.",
@@ -66,6 +73,13 @@ local LOCALES = {
         OPT_SIMPLE_DEL   = "Confirmation simple pour Delete",
         OPT_WIN_RECAP    = "Recap des gagnants de roll",
         OPT_SCALE        = "Echelle des fenetres",
+        OPT_HIDE_SPAM    = "Masquer les messages de roll du chat",
+        HIST_TITLE       = "Historique des rolls",
+        HIST_EMPTY       = "Aucun roll enregistre cette session",
+        OPT_DETAIL_WINS  = "Recap des rolls detaille",
+        HIST_BTN         = "Historique",
+        HELP_HISTORY     = "  /cll history   - ouvre la fenetre d'historique des rolls",
+        EVERYONE_PASSED  = "tout le monde a passe",
         MSG_LOOTSPAM_ON  = "l'option d'interface '%s' a ete activee (necessaire pour le recap des gagnants et les tooltips de roll).",
         WINS_TITLE       = "Gains de roll",
         MSG_TEST_OPEN    = "mode test + options ouverts. Glisse la fenetre avec le clic gauche, tape /cll stop quand t'as fini.",
@@ -172,11 +186,12 @@ local function EnsureBackdropSupport(frame)
     if not frame or frame.__cleanLootBackdropReady then return end
     frame.__cleanLootBackdropReady = true
 
+    -- Try the frame's own SetBackdrop first, WITHOUT mixing anything in.
+    -- ElvUI forks for 3.3.5 may expose a backported BackdropTemplateMixin
+    -- global (present even with every module unticked): blindly mixing it
+    -- in would override a perfectly working native SetBackdrop with a
+    -- differently-behaving one. The mixin is a fallback, never a default.
     if frame.SetBackdrop then
-        if BackdropTemplateMixin and Mixin then
-            pcall(Mixin, frame, BackdropTemplateMixin)
-        end
-        -- Real check: a SetBackdrop that sets nothing is silent.
         local ok = pcall(frame.SetBackdrop, frame, TEST_BACKDROP)
         if ok and frame.GetBackdrop and frame:GetBackdrop() then
             pcall(frame.SetBackdrop, frame, nil)
@@ -184,6 +199,19 @@ local function EnsureBackdropSupport(frame)
         end
     end
 
+    -- Fallback 1: newer-API mixin, then re-test.
+    if BackdropTemplateMixin and Mixin then
+        pcall(Mixin, frame, BackdropTemplateMixin)
+        if frame.SetBackdrop then
+            local ok = pcall(frame.SetBackdrop, frame, TEST_BACKDROP)
+            if ok and frame.GetBackdrop and frame:GetBackdrop() then
+                pcall(frame.SetBackdrop, frame, nil)
+                return
+            end
+        end
+    end
+
+    -- Fallback 2: manual texture shim.
     InstallBackdropShim(frame)
 end
 
@@ -194,11 +222,11 @@ local SKINS = {
     classic = {
         backdrop = {
             bgFile   = "Interface\\ChatFrame\\ChatFrameBackground",
-            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-            tile = true, tileSize = 16, edgeSize = 12,
-            insets = { left = 3, right = 3, top = 3, bottom = 3 },
+            edgeFile = "Interface\\Buttons\\WHITE8x8",
+            tile = false, edgeSize = 1,
+            insets = { left = 1, right = 1, top = 1, bottom = 1 },
         },
-        bg              = { 0.05, 0.05, 0.05, 0.95 },
+        bg              = { 0.04, 0.04, 0.04, 0.9 },
         border          = { 0, 0, 0, 1 },
         showButtonSkin  = false,
         buttonBg        = { 0.08, 0.08, 0.08, 0.9 },
@@ -229,7 +257,7 @@ local SKINS = {
         hideCornerAlways      = true,
         cornerMinQuality      = nil,
         compact         = true,
-        frameSize       = { 210, 58 },
+        frameSize       = { 210, 64 },
     },
 }
 
@@ -251,9 +279,9 @@ local COMPACT_METRICS = {
     iconPos      = { 4, -4 },
     namePos      = { 34, -6 },
     barInset     = 4,
-    barHeight    = 4,
-    buttonHeight = 13,
-    buttonTop    = { 4, -32 },
+    barHeight    = 7,
+    buttonHeight = 14,
+    buttonTop    = { 4, -33 },
 }
 
 local currentSkin = {}
@@ -272,6 +300,31 @@ CopySkin("classic")
 local skinnedFrames = {}
 local skinnedFramesSet = {}
 local skinnedButtons = {}
+
+-- Forward declarations for the replacement-frame pool (defined further down
+-- but referenced by earlier functions like ApplyFrameScale, ApplySkin).
+local NUM_ROLL_FRAMES = 4
+local rollFrames = {}
+local RefreshAllRollFrameSkins
+local ColorRollFrameByQuality
+
+-- Single source of truth for the addon font. Every FontString across the
+-- loot frames and the winners window goes through this, so sizes and face
+-- stay consistent. Falls back safely if GetFont() returns nil (3.3.5 crash
+-- guard). A font selector can later feed CleanLootDB.font here.
+local function GetAddonFont()
+    -- Uses the client's default font face; only the size is skin-driven.
+    local base = STANDARD_TEXT_FONT or ("Fonts" .. "\\" .. "FRIZQT__.TTF")
+    return base
+end
+
+local function ApplyFont(fs, sizeOverride)
+    if not fs then return end
+    local curFace = fs:GetFont()
+    local face = GetAddonFont() or curFace
+    if not face then return end
+    fs:SetFont(face, sizeOverride or currentSkin.fontSize or 11, "OUTLINE")
+end
 
 -------------------------------------------------
 -- Generic helpers
@@ -372,8 +425,22 @@ end
 local function ApplyButtonSkinVisibility(button)
     RefreshButtonTextures(button)
 
+    -- In compact mode, NATIVE buttons must be fully invisible: not just
+    -- their textures, but also the bg/border/label our own skin adds
+    -- (otherwise those show as scattered black boxes at their untouched
+    -- native positions). Our custom buttons keep the full skin.
+    local hideAll = currentSkin.compact and button.__cleanLootNative
+
     if button.__bg then
-        if currentSkin.showButtonSkin then
+        if button.__noButtonBg then
+            -- Transparent background, but keep a thin border so the clickable
+            -- area is visible (compact ElvUI buttons).
+            button.__bg:Hide()
+            if button.__border then
+                button.__border:SetBackdropBorderColor(unpack(currentSkin.buttonBorder))
+                button.__border:Show()
+            end
+        elseif not hideAll and currentSkin.showButtonSkin then
             button.__bg:SetTexture(unpack(currentSkin.buttonBg))
             button.__bg:Show()
             button.__border:SetBackdropBorderColor(unpack(currentSkin.buttonBorder))
@@ -406,11 +473,26 @@ local function ApplyButtonSkinVisibility(button)
     end
 
     if button.__label then
-        if currentSkin.compact then
+        if currentSkin.compact and not hideAll then
             button.__label:Show()
         else
             button.__label:Hide()
         end
+    end
+
+    -- Availability gray-out applied LAST, so it always wins regardless of the
+    -- order in which skin refreshes and state updates run. __unavailable is
+    -- set by UpdateRollFrameButtonStates from the native button's real state.
+    -- __normalTex (the dice/coin/DE icon) is the main visible element in the
+    -- classic skin, so it MUST be included or classic never grays out.
+    local a = button.__unavailable and 0.35 or 1
+    button:SetAlpha(a)
+    if button.__label then button.__label:SetAlpha(a) end
+    if button.__border then button.__border:SetAlpha(a) end
+    if button.__bg then button.__bg:SetAlpha(a) end
+    -- Only dim the icon if it's currently shown (don't resurrect a hidden one).
+    if button.__normalTex and button.__normalTex:GetAlpha() > 0 then
+        button.__normalTex:SetAlpha(a)
     end
 end
 
@@ -471,13 +553,7 @@ local function SkinButton(button, label, iconPath)
     if label and not button.__label then
         local fs = button:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         fs:SetPoint("CENTER")
-        local labelFont = fs:GetFont()
-        if labelFont then
-            -- SetFont(nil, ...) is a known client crash on 3.3.5; GetFont()
-            -- can return nil at /reload time if a font addon has not
-            -- reapplied its fonts yet.
-            fs:SetFont(labelFont, 9, "")
-        end
+        ApplyFont(fs, 9)  -- same face as everything else, smaller size
         fs:SetText(label)
         button.__label = fs
     end
@@ -485,7 +561,7 @@ local function SkinButton(button, label, iconPath)
     if not button.__hoverHooked then
         button.__hoverHooked = true
         button:HookScript("OnEnter", function()
-            if currentSkin.showButtonSkin and button.__bg then
+            if button.__bg and (currentSkin.showButtonSkin or button.__noButtonBg) then
                 button.__bg:SetTexture(unpack(currentSkin.buttonHover))
                 button.__bg:Show()
             end
@@ -504,8 +580,15 @@ end
 -------------------------------------------------
 -- Layout (native Blizzard or compact ElvUI)
 -------------------------------------------------
+local function SetNativeBackdropsShown(frame, shown)
+    for _, e in ipairs(frame.__nativeBackdrops or {}) do
+        e.tex:SetAlpha(shown and e.alpha or 0)
+    end
+end
+
 local function ApplyFrameLayout(frame)
     if currentSkin.compact and currentSkin.frameSize then
+        SetNativeBackdropsShown(frame, false)
         local w, h = currentSkin.frameSize[1], currentSkin.frameSize[2]
         frame:SetSize(w, h)
 
@@ -526,6 +609,13 @@ local function ApplyFrameLayout(frame)
         end
 
         local barRef = frame.__timerBar or frame.__timer
+        -- The frame has TWO native bars (Timer + TimerBar) on this client;
+        -- only one is repositioned. Hide the other, or it stays stretched
+        -- at its native geometry and pokes out of the compact frame.
+        local otherBar = (barRef == frame.__timerBar) and frame.__timer or frame.__timerBar
+        if otherBar and otherBar ~= barRef then
+            otherBar:SetAlpha(0)
+        end
         if barRef then
             barRef:ClearAllPoints()
             barRef:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", COMPACT_METRICS.barInset, COMPACT_METRICS.barInset)
@@ -533,29 +623,32 @@ local function ApplyFrameLayout(frame)
             barRef:SetHeight(COMPACT_METRICS.barHeight)
         end
 
-        local buttons = frame.__buttons or {}
-        local count = #buttons
+        -- Native buttons are NEVER moved (their hitbox desyncs from their
+        -- visual on this client once repositioned). In compact mode they are
+        -- made invisible and mouse-disabled; our custom buttons take over.
+        for _, btn in ipairs(frame.__buttons or {}) do
+            ApplyButtonSkinVisibility(btn)
+            btn:EnableMouse(false)
+        end
+
+        local customs = frame.__customButtons or {}
+        local count = #customs
         if count > 0 then
             local btnW = (w - 8 - (count - 1) * 3) / count
-            for i, btn in ipairs(buttons) do
+            for i, btn in ipairs(customs) do
                 btn:ClearAllPoints()
                 btn:SetSize(btnW, COMPACT_METRICS.buttonHeight)
                 if i == 1 then
                     btn:SetPoint("TOPLEFT", frame, "TOPLEFT", COMPACT_METRICS.buttonTop[1], COMPACT_METRICS.buttonTop[2])
                 else
-                    btn:SetPoint("LEFT", buttons[i - 1], "RIGHT", 3, 0)
+                    btn:SetPoint("LEFT", customs[i - 1], "RIGHT", 3, 0)
                 end
+                ApplyButtonSkinVisibility(btn)
+                btn:Show()
             end
         end
 
         frame.__compactApplied = true
-
-        -- Reapply texture masking on every layout pass (hence on every roll):
-        -- native code may recreate/re-show its textures between two displays,
-        -- which used to make the Pass cross reappear.
-        for _, btn in ipairs(buttons) do
-            ApplyButtonSkinVisibility(btn)
-        end
     else
         -- In classic mode, positions are only restored if compact mode actually
         -- ran before. Otherwise we NEVER touch the native positions/sizes:
@@ -586,18 +679,21 @@ local function ApplyFrameLayout(frame)
             RestorePoints(frame.__timer, frame.__origPoints and frame.__origPoints.timer)
             RestorePoints(frame.__timerBar, frame.__origPoints and frame.__origPoints.timerBar)
 
-            if frame.__buttons and frame.__origPoints and frame.__origPoints.buttons then
-                for i, btn in ipairs(frame.__buttons) do
-                    RestorePoints(btn, frame.__origPoints.buttons[i])
-                    local sz = frame.__origButtonSizes and frame.__origButtonSizes[i]
-                    if sz then btn:SetSize(sz[1], sz[2]) end
-                end
-            end
         end
 
-        -- Restore native texture alphas (without touching positions)
+        -- Restore native backdrops and both bars' visibility.
+        SetNativeBackdropsShown(frame, true)
+        if frame.__timer then frame.__timer:SetAlpha(1) end
+        if frame.__timerBar then frame.__timerBar:SetAlpha(1) end
+
+        -- Hide the compact custom buttons; restore native alphas and mouse
+        -- input (positions are never touched in either mode anymore).
+        for _, btn in ipairs(frame.__customButtons or {}) do
+            btn:Hide()
+        end
         for _, btn in ipairs(frame.__buttons or {}) do
             ApplyButtonSkinVisibility(btn)
+            btn:EnableMouse(true)
         end
     end
 end
@@ -673,10 +769,19 @@ local function GetRollChoices(rollID)
     return rollChoices[rollID]
 end
 
+-- Maps item name -> active rollID, maintained at START/CANCEL time when the
+-- name is reliably available. Far more robust than re-querying
+-- GetLootRollItemInfo on every chat message (which can return a slightly
+-- different or nil name on this client, giving rollID=nil).
+local rollIDByName = {}
+
 local function FindRollIDByItemName(itemName)
     if not itemName then return nil end
-    for i = 1, 4 do
-        local f = _G["GroupLootFrame"..i]
+    -- Primary: the name map filled at START_LOOT_ROLL.
+    if rollIDByName[itemName] then return rollIDByName[itemName] end
+    -- Fallback: query the live frames.
+    for i = 1, NUM_ROLL_FRAMES do
+        local f = rollFrames[i]
         if f and f.rollID and f.rollID >= 0 then
             local ok, _, name = pcall(GetLootRollItemInfo, f.rollID)
             if ok and name == itemName then
@@ -687,6 +792,65 @@ local function FindRollIDByItemName(itemName)
     return nil
 end
 
+-- Roll VALUES (the dice number), captured from "X Roll - N for [Item] by
+-- Player" messages. Stored per rollID as { {player, type, value}, ... }.
+-- type is one of Need/Greed/Disenchant. Also fed into the session history.
+local rollValues = {}
+local rollValuePatterns = {}
+do
+    -- Blizzard globals: e.g. "Need Roll - %d for %s by %s".
+    local defs = {
+        { type = "Need",       fmt = LOOT_ROLL_NEED_PREFIX or "Need Roll - %d for %s by %s" },
+        { type = "Greed",      fmt = LOOT_ROLL_GREED_PREFIX or "Greed Roll - %d for %s by %s" },
+        { type = "Disenchant", fmt = LOOT_ROLL_DISENCHANT_PREFIX or "Disenchant Roll - %d for %s by %s" },
+    }
+    for _, d in ipairs(defs) do
+        if type(d.fmt) == "string" then
+            -- Build a pattern capturing value, item, player in order.
+            local p = d.fmt:gsub("([%^%$%(%)%%%.%[%]%*%+%-%?])", "%%%1")
+            p = p:gsub("%%%%d", "(%%d+)")
+            p = p:gsub("%%%%s", "(.+)")
+            table.insert(rollValuePatterns, { type = d.type, pattern = "^" .. p })
+        end
+    end
+end
+
+local function GetRollValues(rollID)
+    if not rollValues[rollID] then rollValues[rollID] = {} end
+    return rollValues[rollID]
+end
+
+-- Session history: newest first, capped. Each entry captured when a roll is
+-- won or fully resolved: { itemLink, winner, winType, winValue, rolls = {...} }.
+local MAX_HISTORY = 100
+local rollHistory = {}
+local rollItemLinks = {}   -- rollID -> item link (for history/detail display)
+local rollValuesByName = {}  -- item name -> { {player, type, value}, ... }
+
+-- Same winning-tier logic, but keyed by item name (robust: the name is in
+-- every roll/win message, unlike a rollID that must be resolved).
+local function ComputeWinningTierByName(itemName)
+    local vals = rollValuesByName[itemName] or {}
+    local need, greedde = {}, {}
+    for _, v in ipairs(vals) do
+        if v.type == "Need" then
+            table.insert(need, v)
+        elseif v.type == "Greed" or v.type == "Disenchant" then
+            table.insert(greedde, v)
+        end
+    end
+    local tier, list
+    if #need > 0 then
+        tier, list = "Need", need
+    elseif #greedde > 0 then
+        tier, list = "GreedDE", greedde
+    else
+        return "Pass", {}
+    end
+    table.sort(list, function(a, b) return (a.value or 0) > (b.value or 0) end)
+    return tier, list
+end
+
 local rollChoiceWatcher = CreateFrame("Frame")
 rollChoiceWatcher:RegisterEvent("CHAT_MSG_LOOT")
 rollChoiceWatcher:RegisterEvent("START_LOOT_ROLL")
@@ -695,10 +859,46 @@ rollChoiceWatcher:RegisterEvent("CANCEL_LOOT_ROLL")
 rollChoiceWatcher:SetScript("OnEvent", function(self, event, arg1)
     if event == "START_LOOT_ROLL" then
         rollChoices[arg1] = { Need = {}, Greed = {}, Disenchant = {}, Pass = {} }
+        rollValues[arg1] = {}
+        -- Cache the item link now, while the roll is live (needed later for
+        -- the detailed/history display, when the roll may be gone).
+        local link = GetLootRollItemLink and GetLootRollItemLink(arg1)
+        if link then rollItemLinks[arg1] = link end
+        -- Map the item name -> rollID for reliable chat-message matching.
+        local name = select(2, GetLootRollItemInfo(arg1))
+        if (not name or name == "") and link then
+            name = link:match("%[(.-)%]")
+        end
+        if name and name ~= "" then
+            rollIDByName[name] = arg1
+            rollValuesByName[name] = {}  -- fresh capture for this item
+        end
     elseif event == "CANCEL_LOOT_ROLL" then
+        -- Clear the name map entry for this roll.
+        for nm, id in pairs(rollIDByName) do
+            if id == arg1 then rollIDByName[nm] = nil end
+        end
         rollChoices[arg1] = nil
+        rollValues[arg1] = nil
     elseif event == "CHAT_MSG_LOOT" then
         local text = arg1
+
+        -- Roll value line? "Need Roll - 87 for [Item] by Bob". Index by item
+        -- NAME (present in every message) rather than a fragile rollID lookup.
+        for _, def in ipairs(rollValuePatterns) do
+            local value, itemName, player = text:match(def.pattern)
+            if value and player then
+                local bare = itemName and itemName:match("%[(.-)%]") or itemName
+                if bare then
+                    if not rollValuesByName[bare] then rollValuesByName[bare] = {} end
+                    table.insert(rollValuesByName[bare], {
+                        player = player, type = def.type, value = tonumber(value),
+                    })
+                end
+                return
+            end
+        end
+
         if HandleWinMessage and HandleWinMessage(text) then return end
         for _, def in ipairs(ROLL_CHOICE_PATTERNS) do
             local capture = text:match(def.pattern)
@@ -722,6 +922,52 @@ rollChoiceWatcher:SetScript("OnEvent", function(self, event, arg1)
         end
     end
 end)
+
+-- Computes the "winning tier" of a roll from captured values:
+--   any Need  -> Need rolls only
+--   else      -> Greed + Disenchant together (same tier)
+--   else      -> everyone passed
+-- Returns tier ("Need"|"GreedDE"|"Pass") and a sorted-desc list of
+-- { player, type, value } for that tier.
+local function ComputeWinningTier(rollID)
+    local vals = rollValues[rollID] or {}
+    local need, greedde = {}, {}
+    for _, v in ipairs(vals) do
+        if v.type == "Need" then
+            table.insert(need, v)
+        elseif v.type == "Greed" or v.type == "Disenchant" then
+            table.insert(greedde, v)
+        end
+    end
+
+    local tier, list
+    if #need > 0 then
+        tier, list = "Need", need
+    elseif #greedde > 0 then
+        tier, list = "GreedDE", greedde
+    else
+        return "Pass", {}
+    end
+
+    table.sort(list, function(a, b) return (a.value or 0) > (b.value or 0) end)
+    return tier, list
+end
+
+local function RecordHistory(rollID, winner, winType, winValue)
+    local link = rollItemLinks[rollID] or (GetLootRollItemLink and GetLootRollItemLink(rollID))
+    local _, list = ComputeWinningTier(rollID)
+    table.insert(rollHistory, 1, {
+        link = link,
+        winner = winner,
+        winType = winType,
+        winValue = winValue,
+        rolls = list,
+        time = GetTime(),
+    })
+    while #rollHistory > MAX_HISTORY do
+        table.remove(rollHistory)
+    end
+end
 
 local function ShowRollChoiceTooltip(button, frame, choiceKey)
     local rollID = frame.rollID
@@ -765,10 +1011,7 @@ local function SkinLootFrame(frame)
 
     local nameFS = _G[frameName.."Name"] or _G[frameName.."ItemName"]
     if nameFS then
-        local font = nameFS:GetFont()
-        if font then
-            nameFS:SetFont(font, currentSkin.fontSize, "OUTLINE")
-        end
+        ApplyFont(nameFS)
         if not frame.__origNameSize then
             frame.__origNameSize = { nameFS:GetWidth(), nameFS:GetHeight() }
         end
@@ -778,6 +1021,18 @@ local function SkinLootFrame(frame)
     local iconBorder = _G[frameName.."IconFrameIconBorder"] or _G[frameName.."IconFrameBorder"]
     if iconBorder then
         iconBorder:SetVertexColor(0.6, 0.6, 0.6)
+    end
+
+    -- Native parchment/gold backdrop textures behind the name/button area.
+    -- Sized for the native frame, they poke out of the smaller compact frame
+    -- (the "classic skin showing behind compact" artifact), so we hide them
+    -- in compact mode and restore them in classic.
+    frame.__nativeBackdrops = {}
+    for _, suffix in ipairs({ "NameFrame", "SlotTexture", "Background" }) do
+        local tex = _G[frameName..suffix]
+        if tex and tex.SetAlpha then
+            table.insert(frame.__nativeBackdrops, { tex = tex, alpha = tex:GetAlpha() or 1 })
+        end
     end
 
     frame.__icon = _G[frameName.."IconFrame"]
@@ -791,7 +1046,12 @@ local function SkinLootFrame(frame)
     for _, suffix in ipairs({ "RollButton", "NeedButton", "GreedButton", "DisenchantButton", "PassButton" }) do
         local btn = _G[frameName..suffix]
         if btn then
-            local ok, err = pcall(SkinButton, btn, BUTTON_LABELS[suffix])
+            -- No text label on native buttons: they are never repositioned,
+            -- so a label would show at their native spot in compact mode
+            -- (the scattered-duplicates bug). Labels live on our custom
+            -- buttons only.
+            btn.__cleanLootNative = true
+            local ok, err = pcall(SkinButton, btn, nil)
             if not ok then
                 PrintError(frameName..suffix, err)
             end
@@ -810,6 +1070,42 @@ local function SkinLootFrame(frame)
         end
     end
     frame.__buttons = buttons
+
+    -- Compact-mode custom buttons. Native buttons on this client can end up
+    -- with their hitbox desynced from their visual once repositioned (the
+    -- long-standing "Pass does nothing" bug), so in compact mode we never
+    -- move them at all: they are made invisible and mouse-disabled, and
+    -- these homemade buttons call the roll API (RollOnLoot) directly.
+    if not frame.__customButtons then
+        frame.__customButtons = {}
+        local defs = {
+            { key = "Need",       rollType = 1, label = BUTTON_LABELS.RollButton },
+            { key = "Greed",      rollType = 2, label = BUTTON_LABELS.GreedButton },
+            { key = "Disenchant", rollType = 3, label = "DE" },
+            { key = "Pass",       rollType = 0, label = BUTTON_LABELS.PassButton },
+        }
+        for _, def in ipairs(defs) do
+            local btn = CreateFrame("Button", nil, frame)
+            btn.__rollType = def.rollType
+            btn.__noButtonBg = true  -- transparent bg: label + hover only
+            local ok, err = pcall(SkinButton, btn, def.label)
+            if not ok then PrintError("CustomButton", err) end
+            btn:SetScript("OnClick", function(self)
+                local id = frame.rollID
+                if id and id >= 0 then
+                    RollOnLoot(id, self.__rollType)
+                end
+            end)
+            btn:HookScript("OnEnter", function(self)
+                ShowRollChoiceTooltip(self, frame, def.key)
+            end)
+            btn:HookScript("OnLeave", function()
+                GameTooltip:Hide()
+            end)
+            btn:Hide()
+            table.insert(frame.__customButtons, btn)
+        end
+    end
 
     local timer = _G[frameName.."Timer"] or _G[frameName.."RollTimeLeft"]
     local timerBar = _G[frameName.."TimerBar"]
@@ -857,34 +1153,20 @@ local function SkinLootFrame(frame)
     frame.__cleanLootSkinned = true
 end
 
--- Apply a skin profile to every already-skinned frame/button
+-- Apply a skin profile: refresh the replacement-frame pool and the recap.
 local function ApplySkin(name)
     if not SKINS[name] then return end
     CopySkin(name)
     CleanLootDB.skin = name
 
-    for _, frame in ipairs(skinnedFrames) do
-        frame:SetBackdrop(currentSkin.backdrop)
-        frame:SetBackdropColor(unpack(currentSkin.bg))
-        if not frame.rollID or frame.rollID < 0 then
-            frame:SetBackdropBorderColor(unpack(currentSkin.border))
-        end
-        if frame.__nameFS then
-            local font = frame.__nameFS:GetFont()
-            if font then
-                frame.__nameFS:SetFont(font, currentSkin.fontSize, "OUTLINE")
-            end
-        end
-        ApplyFrameLayout(frame)
-        UpdateCornerVisibility(frame, frame.__lastQuality)
+    if RefreshAllRollFrameSkins then
+        RefreshAllRollFrameSkins()
     end
-
-    for _, button in ipairs(skinnedButtons) do
-        ApplyButtonSkinVisibility(button)
-    end
-
-    if RefreshTestFrameSkin then
-        RefreshTestFrameSkin()
+    -- Re-color any frame currently bound to a live roll (border/name).
+    for _, f in ipairs(rollFrames) do
+        if f.rollID and f.rollID >= 0 and ColorRollFrameByQuality then
+            ColorRollFrameByQuality(f)
+        end
     end
     if RefreshWinsSkin then
         RefreshWinsSkin()
@@ -948,13 +1230,9 @@ local function ApplyLayout()
     end
 end
 
--- Blizzard sometimes re-evaluates placement on combat transitions.
-local combatWatcher = CreateFrame("Frame")
-combatWatcher:RegisterEvent("PLAYER_REGEN_DISABLED")
-combatWatcher:RegisterEvent("PLAYER_REGEN_ENABLED")
-combatWatcher:SetScript("OnEvent", function()
-    ApplyLayout()
-end)
+-- (Combat-transition repositioning watcher removed: the replacement frames
+-- are ours and never get repositioned by the client, unlike the old native
+-- GroupLootFrames.)
 
 -- User scale (options slider): uniformly multiplies the on-screen size of
 -- the loot frames, the mover and the recap, without touching internal
@@ -968,13 +1246,9 @@ local function ApplyFrameScale()
         s = 1
         CleanLootDB.frameScale = 1
     end
-    for i = 1, 4 do
-        local f = _G["GroupLootFrame"..i]
-        if f then
-            pcall(f.SetScale, f, s)
-        end
+    for _, f in ipairs(rollFrames) do
+        pcall(f.SetScale, f, s)
     end
-    if testFrame then testFrame:SetScale(s) end
     if winsFrame then winsFrame:SetScale(s) end
 end
 
@@ -994,6 +1268,31 @@ local function DiagnoseFrameState(frame)
     end
 end
 
+-- Grays out the compact custom buttons according to what the item allows
+-- (canNeed/canGreed/canDisenchant from GetLootRollItemInfo). Pass is always
+-- available.
+local function UpdateCustomButtonStates(frame)
+    if not frame.__customButtons then return end
+    local rollID = frame.rollID
+    if not rollID or rollID < 0 then return end
+
+    local ok, _, _, _, _, _, canNeed, canGreed, canDE = pcall(GetLootRollItemInfo, rollID)
+    if not ok then return end
+
+    local allowed = { [1] = canNeed, [2] = canGreed, [3] = canDE, [0] = true }
+    for _, btn in ipairs(frame.__customButtons) do
+        local can = allowed[btn.__rollType]
+        if can == nil then can = true end
+        if can then
+            btn:Enable()
+            btn:SetAlpha(1)
+        else
+            btn:Disable()
+            btn:SetAlpha(0.35)
+        end
+    end
+end
+
 local function ColorFrameByQuality(frame)
     local rollID = frame.rollID
     if not rollID or rollID < 0 then return end
@@ -1003,7 +1302,12 @@ local function ColorFrameByQuality(frame)
 
     frame.__lastQuality = quality
 
-    local color = ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[quality]
+    -- Slight overrides over the default quality palette: the stock epic
+    -- color reads pink on this UI; use a deeper purple for it. Tweak or add
+    -- entries here (indexed by quality) to adjust border/name colors.
+    local QUALITY_TWEAKS = { [4] = { r = 0.55, g = 0.18, b = 0.87 } }
+    local color = QUALITY_TWEAKS[quality]
+        or (ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[quality])
     if color then
         frame:SetBackdropBorderColor(color.r, color.g, color.b, 1)
         if frame.__nameFS then
@@ -1015,79 +1319,154 @@ local function ColorFrameByQuality(frame)
 end
 
 -------------------------------------------------
--- Test frame (mover)
--- GroupLootFrame1 is protected (Show()/Hide() ignored from addon code):
--- so test mode uses a homemade, unprotected clone with the same skin.
--- The saved position is applied to the real frame through ApplyLayout().
+-- Replacement frames (homemade pool)
+-- Instead of reskinning Blizzard's GroupLootFrames (native NameFrame,
+-- double bars, recreated textures, capricious hitboxes...), we hide them
+-- entirely and render our own frames on top, fed from GetLootRollItemInfo
+-- and rolling through RollOnLoot directly. Same rendering path as the old
+-- test frame, generalized into a pool of 4.
 -------------------------------------------------
-local function CreateTestFrame()
-    if testFrame then return testFrame end
+local rollFrameByRollID = {}
 
-    local f = CreateFrame("Frame", "CleanLootTestFrame", UIParent)
-    -- Default size and position set IMMEDIATELY: even if the skin fails
-    -- further down, the frame never stays at 0x0 (invisible).
+local ICON_TEXTURES = {
+    { rollType = 1, key = "Need",       label = BUTTON_LABELS.RollButton,  texture = "Interface\\Buttons\\UI-GroupLoot-Dice-Up" },
+    { rollType = 2, key = "Greed",      label = BUTTON_LABELS.GreedButton, texture = "Interface\\Buttons\\UI-GroupLoot-Coin-Up" },
+    { rollType = 3, key = "Disenchant", label = "DE",                      texture = "Interface\\Buttons\\UI-GroupLoot-DE-Up" },
+    { rollType = 0, key = "Pass",       label = BUTTON_LABELS.PassButton,  texture = "Interface\\Buttons\\UI-GroupLoot-Pass-Up" },
+}
+
+local ApplyRollFrameLayout
+local RefreshRollFrameSkin
+local UpdateRollFrameButtonStates
+
+local function CreateRollFrame(index)
+    local f = CreateFrame("Frame", "CleanLootFrame"..index, UIParent)
     f:SetSize(252, 84)
-    f:SetPoint("CENTER", UIParent, "CENTER", 0, 120)
     f:SetFrameStrata("DIALOG")
+    f:Hide()
 
+    -- Icon (with its own texture) + a decoration/corner reference kept nil:
+    -- our frames have no native dragon, so UpdateCornerVisibility is a no-op.
     local icon = CreateFrame("Frame", nil, f)
+    icon:EnableMouse(true)
     local iconTex = icon:CreateTexture(nil, "ARTWORK")
     iconTex:SetAllPoints(icon)
-    iconTex:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
+    -- Zoom ~30% into the icon to crop the ugly rounded border (like WeakAuras).
+    -- 0.15 inset on each side = 30% total crop.
+    iconTex:SetTexCoord(0.15, 0.85, 0.15, 0.85)
     f.__icon = icon
+    f.__iconTex = iconTex
+
+    -- Item tooltip on hover (with Shift = compare handled natively by the
+    -- client). Ctrl+left-click = dress-up/inspect the item's appearance.
+    -- Shift+left-click = link in chat.
+    icon:SetScript("OnEnter", function(self)
+        local id = f.rollID
+        if id and id >= 0 then
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            if pcall(GameTooltip.SetLootRollItem, GameTooltip, id) then
+                GameTooltip:Show()
+            else
+                GameTooltip:Hide()
+            end
+        end
+    end)
+    icon:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    icon:SetScript("OnMouseUp", function(self, button)
+        local id = f.rollID
+        if not (id and id >= 0) then return end
+        if button == "LeftButton" then
+            local link = GetLootRollItemLink(id)
+            if IsControlKeyDown() and link and DressUpItemLink then
+                DressUpItemLink(link)
+            elseif IsShiftKeyDown() and link and ChatEdit_InsertLink then
+                ChatEdit_InsertLink(link)
+            end
+        end
+    end)
 
     local name = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     name:SetJustifyH("LEFT")
-    name:SetText(L.TEST_ITEM)
-    name:SetTextColor(0.64, 0.21, 0.93)
+    ApplyFont(name)
     f.__nameFS = name
 
     local timer = CreateFrame("StatusBar", nil, f)
     timer:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
     timer:SetMinMaxValues(0, 1)
-    timer:SetValue(0.6)
+    timer:SetValue(1)
     f.__timer = timer
 
-    local buttonDefs = {
-        { label = BUTTON_LABELS.RollButton,       texture = "Interface\\Buttons\\UI-GroupLoot-Dice-Up" },
-        { label = BUTTON_LABELS.GreedButton,      texture = "Interface\\Buttons\\UI-GroupLoot-Coin-Up" },
-        { label = BUTTON_LABELS.DisenchantButton, texture = "Interface\\Buttons\\UI-GroupLoot-DE-Up" },
-        { label = BUTTON_LABELS.PassButton,       texture = "Interface\\Buttons\\UI-GroupLoot-Pass-Up" },
-    }
+    -- Roll buttons: icon (native art) + text label; roll through RollOnLoot.
     local buttons = {}
-    for _, def in ipairs(buttonDefs) do
+    for _, def in ipairs(ICON_TEXTURES) do
         local btn = CreateFrame("Button", nil, f)
+        btn.__rollType = def.rollType
+        btn.__choiceKey = def.key
         btn:SetNormalTexture(def.texture)
         local ok, err = pcall(SkinButton, btn, def.label)
-        if not ok then PrintError("TestButton", err) end
+        if not ok then PrintError("RollFrameButton", err) end
+        btn:SetScript("OnClick", function(self)
+            local id = f.rollID
+            -- Don't roll a type the item disallows (a disabled button means
+            -- canNeed/canGreed/canDE was false): RollOnLoot with an illegal
+            -- type raises a Lua error on 3.3.5. pcall guards anything else.
+            if id and id >= 0 and self:IsEnabled() then
+                local ok, err = pcall(RollOnLoot, id, self.__rollType)
+                if not ok then PrintError("RollOnLoot", err) end
+            end
+        end)
+        btn:HookScript("OnEnter", function(self)
+            ShowRollChoiceTooltip(self, f, def.key)
+        end)
+        btn:HookScript("OnLeave", function() GameTooltip:Hide() end)
         table.insert(buttons, btn)
     end
     f.__buttons = buttons
 
+    -- First frame is the movable anchor; others stack onto it.
     f:SetMovable(true)
     f:SetClampedToScreen(true)
-    f:EnableMouse(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", f.StartMoving)
-    f:SetScript("OnDragStop", function(self)
-        self:StopMovingOrSizing()
-        SavePosition(self)
+    if index == 1 then
+        f:EnableMouse(true)
+        f:RegisterForDrag("LeftButton")
+        f:SetScript("OnDragStart", f.StartMoving)
+        f:SetScript("OnDragStop", function(self)
+            self:StopMovingOrSizing()
+            SavePosition(self)
+        end)
+    end
+
+    -- Timer countdown: we drive it ourselves from START_LOOT_ROLL's rollTime.
+    f:SetScript("OnUpdate", function(self)
+        if self.__endTime and self.__duration and self.__duration > 0 then
+            local remaining = self.__endTime - GetTime()
+            if remaining < 0 then remaining = 0 end
+            self.__timer:SetValue(remaining / self.__duration)
+        end
+        UpdateTimerColor(self.__timer)
+
+        -- Re-evaluate button availability for the first couple of seconds:
+        -- on this client, canNeed/canGreed/canDisenchant from
+        -- GetLootRollItemInfo are sometimes not populated yet at
+        -- START_LOOT_ROLL time, so a one-shot check would leave unusable
+        -- buttons ungrayed.
+        if self.rollID and self.rollID >= 0 and self.__stateUntil and GetTime() < self.__stateUntil then
+            if UpdateRollFrameButtonStates then UpdateRollFrameButtonStates(self) end
+        end
     end)
 
-    f:SetScript("OnUpdate", function()
-        UpdateTimerColor(timer)
-    end)
-
-    testFrame = f
-    local ok, err = pcall(RefreshTestFrameSkin)
-    if not ok then PrintError("RefreshTestFrameSkin", err) end
     return f
 end
 
-local function ApplyTestFrameLayout()
-    if not testFrame then return end
-    local f = testFrame
+local function GetRollFrame(index)
+    if not rollFrames[index] then
+        rollFrames[index] = CreateRollFrame(index)
+        RefreshRollFrameSkin(rollFrames[index])
+    end
+    return rollFrames[index]
+end
 
+ApplyRollFrameLayout = function(f)
     if currentSkin.compact and currentSkin.frameSize then
         local w, h = currentSkin.frameSize[1], currentSkin.frameSize[2]
         f:SetSize(w, h)
@@ -1110,6 +1489,7 @@ local function ApplyTestFrameLayout()
         local count = #f.__buttons
         local btnW = (w - 8 - (count - 1) * 3) / count
         for i, btn in ipairs(f.__buttons) do
+            btn.__noButtonBg = true
             btn:ClearAllPoints()
             btn:SetSize(btnW, COMPACT_METRICS.buttonHeight)
             if i == 1 then
@@ -1133,10 +1513,11 @@ local function ApplyTestFrameLayout()
 
         f.__timer:ClearAllPoints()
         f.__timer:SetPoint("TOPLEFT", f.__icon, "TOPRIGHT", 6, -22)
-        f.__timer:SetSize(190, 8)
+        f.__timer:SetSize(190, 10)
 
         local prev
         for _, btn in ipairs(f.__buttons) do
+            btn.__noButtonBg = false
             btn:ClearAllPoints()
             btn:SetSize(30, 30)
             if prev then
@@ -1149,44 +1530,220 @@ local function ApplyTestFrameLayout()
     end
 end
 
-RefreshTestFrameSkin = function()
-    if not testFrame then return end
-
-    EnsureBackdropSupport(testFrame)
-    testFrame:SetBackdrop(currentSkin.backdrop)
-    testFrame:SetBackdropColor(unpack(currentSkin.bg))
-    -- Fixed purple border: visually signals test mode.
-    testFrame:SetBackdropBorderColor(0.64, 0.21, 0.93, 1)
-
-    if testFrame.__nameFS then
-        local font = testFrame.__nameFS:GetFont()
-        if font then
-            testFrame.__nameFS:SetFont(font, currentSkin.fontSize, "OUTLINE")
-        end
-    end
-
-    ApplyTestFrameLayout()
-
-    for _, btn in ipairs(testFrame.__buttons or {}) do
+RefreshRollFrameSkin = function(f)
+    if not f then return end
+    EnsureBackdropSupport(f)
+    f:SetBackdrop(currentSkin.backdrop)
+    f:SetBackdropColor(unpack(currentSkin.bg))
+    f:SetBackdropBorderColor(unpack(currentSkin.border))
+    ApplyFont(f.__nameFS)
+    ApplyRollFrameLayout(f)
+    for _, btn in ipairs(f.__buttons or {}) do
         ApplyButtonSkinVisibility(btn)
     end
 end
 
+RefreshAllRollFrameSkins = function()
+    for _, f in ipairs(rollFrames) do
+        RefreshRollFrameSkin(f)
+    end
+end
+
+-- Stack visible replacement frames like the old ApplyLayout did.
+local function LayoutRollFrames()
+    local direction = CleanLootDB.growDirection or "DOWN"
+    local spacing = 9
+    local prev = nil
+    for i = 1, NUM_ROLL_FRAMES do
+        local f = rollFrames[i]
+        if f and f:IsShown() then
+            f:ClearAllPoints()
+            if not prev then
+                if CleanLootDB.point then
+                    f:SetPoint(CleanLootDB.point, UIParent, CleanLootDB.relativePoint, CleanLootDB.x, CleanLootDB.y)
+                else
+                    f:SetPoint("CENTER", UIParent, "CENTER", 0, 150)
+                end
+            elseif direction == "UP" then
+                f:SetPoint("BOTTOM", prev, "TOP", 0, spacing)
+            else
+                f:SetPoint("TOP", prev, "BOTTOM", 0, -spacing)
+            end
+            prev = f
+        end
+    end
+end
+
+ColorRollFrameByQuality = function(f)
+    local id = f.rollID
+    if not id or id < 0 then return end
+    local texture, name, count, quality = GetLootRollItemInfo(id)
+    local QUALITY_TWEAKS = { [4] = { r = 0.55, g = 0.18, b = 0.87 } }
+    local color = quality and (QUALITY_TWEAKS[quality] or (ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[quality]))
+    if color then
+        f:SetBackdropBorderColor(color.r, color.g, color.b, 1)
+        if f.__nameFS then f.__nameFS:SetTextColor(color.r, color.g, color.b) end
+    end
+end
+
+-- Finds the native GroupLootFrame bound to a given rollID (Blizzard sets
+-- .rollID on each). Used to read the real state its buttons computed.
+local function FindNativeFrameByRollID(rollID)
+    for i = 1, 4 do
+        local nf = _G["GroupLootFrame"..i]
+        if nf and nf.rollID == rollID then
+            return nf, "GroupLootFrame"..i
+        end
+    end
+    return nil
+end
+
+UpdateRollFrameButtonStates = function(f)
+    local id = f.rollID
+    if not id or id < 0 then return end
+    local ok, _, _, _, _, _, canNeed, canGreed, canDE = pcall(GetLootRollItemInfo, id)
+    if not ok then return end
+
+    -- On this server, GetLootRollItemInfo's can* flags are not reliable
+    -- (Need can be restricted per item, and Disenchant depends on ANYONE in
+    -- the group having Enchanting). The native (hidden) buttons already
+    -- reflect the truth the client computed, so we read their shown/enabled
+    -- state instead, and only fall back to the flags if a native button is
+    -- missing.
+    local _, nativeName = FindNativeFrameByRollID(id)
+    if nativeName then
+        local function nativeState(suffix, fallback)
+            local btn = _G[nativeName..suffix]
+            if not btn then return fallback end
+            local shown = (not btn.IsShown) or btn:IsShown()
+            local enabled = (not btn.IsEnabled) or btn:IsEnabled()
+            return shown and enabled
+        end
+        -- Native Need button is "RollButton" on 3.3.5; some clients also
+        -- expose "NeedButton". Try both.
+        local needBtn = _G[nativeName.."NeedButton"] or _G[nativeName.."RollButton"]
+        if needBtn then
+            local shown = (not needBtn.IsShown) or needBtn:IsShown()
+            local enabled = (not needBtn.IsEnabled) or needBtn:IsEnabled()
+            canNeed = shown and enabled
+        end
+        canGreed = nativeState("GreedButton", canGreed)
+        canDE = nativeState("DisenchantButton", canDE)
+    end
+
+    local allowed = { [1] = canNeed, [2] = canGreed, [3] = canDE, [0] = true }
+    for _, btn in ipairs(f.__buttons) do
+        local raw = allowed[btn.__rollType]
+        if raw == nil then raw = true end
+        -- CRITICAL: native flags return 1/0 (numbers), and in Lua 0 is TRUTHY.
+        -- So `not 0` is false and the gray-out never triggered. Normalize to a
+        -- real boolean: only 1/true count as "can".
+        local can = (raw == true) or (raw == 1)
+        if can then btn:Enable() else btn:Disable() end
+        btn.__unavailable = not can
+        ApplyButtonSkinVisibility(btn)
+    end
+end
+
+-- Fill a replacement frame from a live rollID and show it.
+local function StartRollFrame(rollID, rollTime)
+    -- Find a free frame (not currently bound to a roll).
+    local f
+    for i = 1, NUM_ROLL_FRAMES do
+        local cand = GetRollFrame(i)
+        if not cand.rollID then f = cand break end
+    end
+    if not f then f = GetRollFrame(1) end
+
+    f.rollID = rollID
+    rollFrameByRollID[rollID] = f
+
+    local texture, name, count, quality, bop, canNeed, canGreed, canDE = GetLootRollItemInfo(rollID)
+    f.__iconTex:SetTexture(texture)
+    if f.__nameFS then
+        f.__nameFS:SetText(name or "")
+    end
+
+    local dur = (rollTime and rollTime > 0 and rollTime / 1000) or 60
+    f.__duration = dur
+    f.__endTime = GetTime() + dur
+    f.__stateUntil = GetTime() + 2  -- re-check button availability for 2s
+    f.__timer:SetValue(1)
+
+    RefreshRollFrameSkin(f)
+    ColorRollFrameByQuality(f)
+    UpdateRollFrameButtonStates(f)
+    f:Show()
+    LayoutRollFrames()
+end
+
+local function StopRollFrame(rollID)
+    local f = rollFrameByRollID[rollID]
+    if not f then return end
+    f.rollID = nil
+    f.__endTime = nil
+    rollFrameByRollID[rollID] = nil
+    f:Hide()
+    LayoutRollFrames()
+end
+
+-- Hide/neutralize the native Blizzard loot frames: we render our own.
+local nativeHidden = {}
+local function NeutralizeNativeFrames()
+    for i = 1, 4 do
+        local nf = _G["GroupLootFrame"..i]
+        if nf and not nativeHidden[nf] then
+            nativeHidden[nf] = true
+            nf:SetAlpha(0)
+            nf:EnableMouse(false)
+            -- Move it far off-screen so nothing native ever shows. Hooking
+            -- OnShow to re-hide covers the client re-showing it each roll.
+            nf:HookScript("OnShow", function(self)
+                self:SetAlpha(0)
+                self:ClearAllPoints()
+                self:SetPoint("TOPLEFT", UIParent, "TOPRIGHT", 500, 0)
+            end)
+            nf:ClearAllPoints()
+            nf:SetPoint("TOPLEFT", UIParent, "TOPRIGHT", 500, 0)
+        end
+    end
+end
+
 local function ShowTestFrame()
-    local f = CreateTestFrame()
-    -- Systematic refresh: if the skin failed at creation time (frame is
-    -- cached), retry here instead of staying stuck in the broken state.
-    local ok, err = pcall(RefreshTestFrameSkin)
-    if not ok then PrintError("RefreshTestFrameSkin", err) end
-    RestorePosition(f)
+    -- Test mode drives a real pool frame (index 1) with dummy data so the
+    -- preview is identical to a live roll. A fixed rollID of -1 marks it as
+    -- test (buttons no-op on rollID < 0).
+    NeutralizeNativeFrames()
+    local f = GetRollFrame(1)
+    f.rollID = -1
+    f.__iconTex:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
+    if f.__nameFS then f.__nameFS:SetText(L.TEST_ITEM) end
+    f.__duration = 60
+    f.__endTime = GetTime() + 60
+    f.__timer:SetValue(0.6)
+
+    RefreshRollFrameSkin(f)
+    -- Purple border signals test mode.
+    f:SetBackdropBorderColor(0.64, 0.21, 0.93, 1)
+    for _, btn in ipairs(f.__buttons) do btn:Enable() btn:SetAlpha(1) end
+
+    f:ClearAllPoints()
+    if CleanLootDB.point then
+        f:SetPoint(CleanLootDB.point, UIParent, CleanLootDB.relativePoint, CleanLootDB.x, CleanLootDB.y)
+    else
+        f:SetPoint("CENTER", UIParent, "CENTER", 0, 150)
+    end
     ApplyFrameScale()
     testModeActive = true
     f:Show()
 end
 
 local function HideTestFrame()
-    if testFrame then
-        testFrame:Hide()
+    local f = rollFrames[1]
+    if f and f.rollID == -1 then
+        f.rollID = nil
+        f.__endTime = nil
+        f:Hide()
     end
     testModeActive = false
 end
@@ -1222,6 +1779,13 @@ end
 
 local winEntries = {}
 
+-- Roll-type icons, shared by the recap and history windows.
+local TYPE_ICON = {
+    Need       = "Interface\\Buttons\\UI-GroupLoot-Dice-Up",
+    Greed      = "Interface\\Buttons\\UI-GroupLoot-Coin-Up",
+    Disenchant = "Interface\\Buttons\\UI-GroupLoot-DE-Up",
+}
+
 local WIN_PATTERNS = {}
 do
     local function AddWinPattern(fmt, isSelf)
@@ -1234,6 +1798,45 @@ do
         table.insert(WIN_PATTERNS, { pattern = "^(.+) won: ", isSelf = false })
         table.insert(WIN_PATTERNS, { pattern = "^You won: ", isSelf = true })
     end
+end
+
+-- Optional chat cleanup: ChatFrame message filters hide messages from the
+-- chat DISPLAY only; the CHAT_MSG_LOOT event still fires for addons, so the
+-- recap and roll tooltips keep working. Win announcements are only hidden
+-- when the recap is enabled, so the information is never lost.
+local function SpamFormatToPattern(fmt)
+    if type(fmt) ~= "string" then return nil end
+    local p = fmt:gsub("([%^%$%(%)%%%.%[%]%*%+%-%?])", "%%%1")
+    p = p:gsub("%%%%s", ".+")
+    p = p:gsub("%%%%d", "%%d+")
+    return "^" .. p .. "$"
+end
+
+local EXTRA_SPAM_PATTERNS = {}
+for _, fmt in ipairs({ LOOT_ROLL_ALL_PASSED, LOOT_ROLL_PASSED_AUTO,
+                       LOOT_ROLL_ROLLED_NEED, LOOT_ROLL_ROLLED_GREED, LOOT_ROLL_ROLLED_DE }) do
+    local p = SpamFormatToPattern(fmt)
+    if p then table.insert(EXTRA_SPAM_PATTERNS, p) end
+end
+
+local function RollSpamFilter(self, event, msg)
+    if not CleanLootDB.hideRollSpam or type(msg) ~= "string" then return false end
+    for _, def in ipairs(ROLL_CHOICE_PATTERNS) do
+        if msg:match(def.pattern) then return true end
+    end
+    for _, p in ipairs(EXTRA_SPAM_PATTERNS) do
+        if msg:match(p) then return true end
+    end
+    if CleanLootDB.winRecap then
+        for _, def in ipairs(WIN_PATTERNS) do
+            if msg:match(def.pattern) then return true end
+        end
+    end
+    return false
+end
+
+if ChatFrame_AddMessageEventFilter then
+    ChatFrame_AddMessageEventFilter("CHAT_MSG_LOOT", RollSpamFilter)
 end
 
 local function SaveWinsPosition()
@@ -1261,7 +1864,7 @@ local function CreateWinsFrame()
     if winsFrame then return winsFrame end
 
     local f = CreateFrame("Frame", "CleanLootWinsFrame", UIParent)
-    f:SetSize(220, 40)
+    f:SetSize(240, 40)
     f:SetFrameStrata("MEDIUM")
     f:SetMovable(true)
     f:SetClampedToScreen(true)
@@ -1276,6 +1879,7 @@ local function CreateWinsFrame()
     local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     title:SetPoint("TOPLEFT", 6, -5)
     title:SetText(L.WINS_TITLE)
+    ApplyFont(title)
     f.__title = title
 
     -- Pool of clickable lines (mouseover -> item tooltip)
@@ -1286,9 +1890,16 @@ local function CreateWinsFrame()
         line:SetPoint("TOPLEFT", f, "TOPLEFT", 6, -18 - (i - 1) * 15)
         line:SetPoint("TOPRIGHT", f, "TOPRIGHT", -6, -18 - (i - 1) * 15)
 
+        local typeIcon = line:CreateTexture(nil, "ARTWORK")
+        typeIcon:SetSize(12, 12)
+        typeIcon:SetPoint("LEFT", 0, 0)
+        line.__typeIcon = typeIcon
+
         local fs = line:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        fs:SetAllPoints(line)
+        fs:SetPoint("LEFT", typeIcon, "RIGHT", 3, 0)
+        fs:SetPoint("RIGHT", line, "RIGHT", 0, 0)
         fs:SetJustifyH("LEFT")
+        ApplyFont(fs)
         line.__text = fs
 
         line:SetScript("OnEnter", function(self)
@@ -1336,8 +1947,13 @@ RefreshWinsSkin = function()
     if not winsFrame then return end
     EnsureBackdropSupport(winsFrame)
     winsFrame:SetBackdrop(currentSkin.backdrop)
+    -- Same bg table as the loot frames => identical opacity by construction.
     winsFrame:SetBackdropColor(unpack(currentSkin.bg))
     winsFrame:SetBackdropBorderColor(unpack(currentSkin.border))
+    ApplyFont(winsFrame.__title)
+    for _, line in ipairs(winsFrame.__lines or {}) do
+        ApplyFont(line.__text)
+    end
 end
 
 RefreshWinsDisplay = function()
@@ -1353,6 +1969,17 @@ RefreshWinsDisplay = function()
         if entry then
             line.__link = entry.link
             line.__text:SetText(entry.text)
+            if line.__typeIcon then
+                local icon = entry.winType and TYPE_ICON[entry.winType]
+                if icon then
+                    line.__typeIcon:SetTexture(icon)
+                    line.__typeIcon:Show()
+                    line.__text:SetPoint("LEFT", line.__typeIcon, "RIGHT", 3, 0)
+                else
+                    line.__typeIcon:Hide()
+                    line.__text:SetPoint("LEFT", line, "LEFT", 0, 0)
+                end
+            end
             line:Show()
         else
             line.__link = nil
@@ -1399,39 +2026,252 @@ end
 
 -- Called for every CHAT_MSG_LOOT message; returns true if it was a win
 -- announcement (handled), to avoid useless work afterwards.
-HandleWinMessage = function(text)
-    if not CleanLootDB.winRecap then return false end
+local TYPE_ABBR = { Need = NEED or "Need", Greed = GREED or "Greed", Disenchant = "DE" }
 
+HandleWinMessage = function(text)
     for _, def in ipairs(WIN_PATTERNS) do
         local capture = text:match(def.pattern)
         if capture then
             local playerName = def.isSelf and (UnitName("player") or "?") or capture
-            -- Full colored link for display, bare link for the tooltip.
             local coloredLink = text:match("|c%x+|Hitem:[^|]+|h%[[^%]]+%]|h|r")
             local bareLink = text:match("|H(item:[^|]+)|h")
             local displayName = coloredLink or text:match("%[(.-)%]") or "?"
+            local itemName = text:match("%[(.-)%]")
 
-            CreateWinsFrame()
-            table.insert(winEntries, 1, {
-                text = ("%s: %s"):format(playerName, displayName),
-                link = bareLink,
-                expires = GetTime() + WIN_DURATION,
-            })
-            while #winEntries > MAX_WIN_LINES do
-                table.remove(winEntries)
+            -- Resolve tier/value by ITEM NAME (present in the message).
+            local winType, winValue, rolls
+            if itemName then
+                local tier, list = ComputeWinningTierByName(itemName)
+                rolls = list
+                if list[1] then
+                    winValue = list[1].value
+                    winType = list[1].type
+                end
             end
-            RefreshWinsDisplay()
-            return true
+
+            -- Record history (always, with whatever we have).
+            table.insert(rollHistory, 1, {
+                link = coloredLink or ("["..(itemName or "item").."]"),
+                bareLink = bareLink,
+                winner = playerName,
+                winType = winType,
+                winValue = winValue,
+                rolls = rolls or {},
+                time = GetTime(),
+            })
+            while #rollHistory > MAX_HISTORY do table.remove(rollHistory) end
+
+            -- Clear captured values for this item (roll resolved).
+            rollValuesByName[itemName] = nil
+
+            if CleanLootDB.winRecap then
+                local prefix
+                if winValue then
+                    prefix = ("%s - %d"):format(playerName, winValue)
+                else
+                    prefix = playerName
+                end
+                CreateWinsFrame()
+                table.insert(winEntries, 1, {
+                    text = ("%s: %s"):format(prefix, displayName),
+                    link = bareLink,
+                    winType = winType,
+                    detailRolls = rolls,
+                    itemName = itemName,
+                    expires = GetTime() + WIN_DURATION,
+                })
+                while #winEntries > MAX_WIN_LINES do
+                    table.remove(winEntries)
+                end
+                RefreshWinsDisplay()
+            end
+            return CleanLootDB.winRecap and true or false
         end
     end
     return false
 end
 
 -------------------------------------------------
--- Simple confirmation for item deletion
--- Replaces typing the word "DELETE" with a simple Yes/No.
+-- Roll history window (session only)
+-- Opened via /cll history or the options button. Lists past items with the
+-- winner, winning type/value, and each item's winning-tier rolls, which can
+-- be expanded/collapsed per item.
 -------------------------------------------------
-local originalDeleteGoodItem
+local historyFrame
+local historyExpanded = {}  -- index -> bool
+
+local HISTORY_LINES = 14
+local HIST_LINE_H = 16
+local RefreshHistory
+
+local function CreateHistoryFrame()
+    if historyFrame then return historyFrame end
+
+    local f = CreateFrame("Frame", "CleanLootHistoryFrame", UIParent)
+    f:SetSize(320, 30 + HISTORY_LINES * HIST_LINE_H + 16)
+    f:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+    f:SetFrameStrata("DIALOG")
+    EnsureBackdropSupport(f)
+    f:SetBackdrop({
+        bgFile   = "Interface\\ChatFrame\\ChatFrameBackground",
+        edgeFile = "Interface\\Buttons\\WHITE8x8",
+        tile = false, edgeSize = 1,
+        insets = { left = 1, right = 1, top = 1, bottom = 1 },
+    })
+    f:SetBackdropColor(0.05, 0.05, 0.05, 0.95)
+    f:SetBackdropBorderColor(0, 0, 0, 1)
+    f:SetMovable(true)
+    f:EnableMouse(true)
+    f:RegisterForDrag("LeftButton")
+    f:SetScript("OnDragStart", f.StartMoving)
+    f:SetScript("OnDragStop", f.StopMovingOrSizing)
+
+    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    title:SetPoint("TOP", 0, -8)
+    title:SetText(L.HIST_TITLE)
+    ApplyFont(title, 12)
+
+    local closeBtn = CreateFrame("Button", nil, f, "UIPanelCloseButton")
+    closeBtn:SetPoint("TOPRIGHT", -2, -2)
+
+    local scroll = CreateFrame("ScrollFrame", "CleanLootHistoryScroll", f, "FauxScrollFrameTemplate")
+    scroll:SetPoint("TOPLEFT", 8, -28)
+    scroll:SetPoint("BOTTOMRIGHT", -28, 8)
+    scroll:SetScript("OnVerticalScroll", function(self, offset)
+        FauxScrollFrame_OnVerticalScroll(self, offset, HIST_LINE_H, function() RefreshHistory() end)
+    end)
+    f.__scroll = scroll
+
+    f.__lines = {}
+    for i = 1, HISTORY_LINES do
+        local line = CreateFrame("Button", nil, f)
+        line:SetHeight(HIST_LINE_H)
+        line:SetPoint("TOPLEFT", f, "TOPLEFT", 10, -28 - (i - 1) * HIST_LINE_H)
+        line:SetPoint("TOPRIGHT", f, "TOPRIGHT", -28, -28 - (i - 1) * HIST_LINE_H)
+
+        local icon = line:CreateTexture(nil, "ARTWORK")
+        icon:SetSize(12, 12)
+        icon:SetPoint("LEFT", 0, 0)
+        line.__icon = icon
+
+        local fs = line:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        fs:SetPoint("LEFT", icon, "RIGHT", 3, 0)
+        fs:SetPoint("RIGHT", line, "RIGHT", 0, 0)
+        fs:SetJustifyH("LEFT")
+        ApplyFont(fs)
+        line.__text = fs
+
+        local hl = line:CreateTexture(nil, "HIGHLIGHT")
+        hl:SetAllPoints()
+        hl:SetTexture(0.3, 0.5, 0.8, 0.15)
+
+        line:SetScript("OnEnter", function(self)
+            if self.__link then
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                if pcall(GameTooltip.SetHyperlink, GameTooltip, self.__link) then GameTooltip:Show() end
+            end
+        end)
+        line:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        line:SetScript("OnClick", function(self)
+            if self.__histIndex then
+                historyExpanded[self.__histIndex] = not historyExpanded[self.__histIndex]
+                RefreshHistory()
+            end
+        end)
+        table.insert(f.__lines, line)
+    end
+
+    local empty = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    empty:SetPoint("TOP", 0, -60)
+    empty:SetText(L.HIST_EMPTY)
+    empty:Hide()
+    f.__empty = empty
+
+    -- New frames are shown by default; hide it so the first ToggleHistory
+    -- call opens it instead of seeing it already-shown and closing it (the
+    -- "have to click twice the first time" bug).
+    f:Hide()
+
+    historyFrame = f
+    return f
+end
+
+-- Flattens history into display rows (header rows + expanded roll rows).
+local function BuildHistoryRows()
+    local rows = {}
+    for idx, entry in ipairs(rollHistory) do
+        local linkText = entry.link and ("|H"..entry.link.."|h["..(entry.link:match("%[?([^%]|]+)")or"item").."]|h") or "[item]"
+        -- Use the stored full link if it already includes color/brackets.
+        local shown = entry.link or "[item]"
+        local header
+        local expandable = entry.rolls and #entry.rolls > 0
+        local arrow = expandable and (historyExpanded[idx] and "- " or "+ ") or "  "
+        if entry.winner then
+            local suffix = ""
+            if entry.winType and entry.winValue then
+                suffix = (" - %s %d"):format(TYPE_ABBR[entry.winType] or entry.winType, entry.winValue)
+            elseif entry.winType then
+                suffix = (" - %s"):format(TYPE_ABBR[entry.winType] or entry.winType)
+            end
+            header = ("%s%s: %s%s"):format(arrow, entry.winner, shown, suffix)
+        else
+            header = ("%s%s - %s"):format(arrow, shown, L.EVERYONE_PASSED)
+        end
+        table.insert(rows, { text = header, link = entry.link, histIndex = idx, isHeader = true })
+
+        if expandable and historyExpanded[idx] then
+            for _, r in ipairs(entry.rolls) do
+                table.insert(rows, {
+                    text = ("    %d - %s"):format(r.value or 0, r.player),
+                    icon = TYPE_ICON[r.type],
+                    isRoll = true,
+                })
+            end
+        end
+    end
+    return rows
+end
+
+RefreshHistory = function()
+    if not historyFrame then return end
+    local rows = BuildHistoryRows()
+    local total = #rows
+    FauxScrollFrame_Update(historyFrame.__scroll, total, HISTORY_LINES, HIST_LINE_H)
+    local offset = FauxScrollFrame_GetOffset(historyFrame.__scroll)
+
+    for i = 1, HISTORY_LINES do
+        local line = historyFrame.__lines[i]
+        local row = rows[offset + i]
+        if row then
+            line.__text:SetText(row.text)
+            line.__link = row.link
+            line.__histIndex = row.histIndex
+            if row.icon then
+                line.__icon:SetTexture(row.icon)
+                line.__icon:Show()
+            else
+                line.__icon:Hide()
+            end
+            line:Show()
+        else
+            line:Hide()
+        end
+    end
+
+    historyFrame.__empty:SetShown(total == 0)
+end
+
+local function ToggleHistory()
+    local f = CreateHistoryFrame()
+    if f:IsShown() then
+        f:Hide()
+    else
+        RefreshHistory()
+        f:Show()
+    end
+end
+
+
 
 local function ApplyDeleteConfirmOverride()
     local d = StaticPopupDialogs and StaticPopupDialogs["DELETE_GOOD_ITEM"]
@@ -1522,7 +2362,7 @@ local function CreateOptionsFrame()
     if optionsFrame then return optionsFrame end
 
     local f = CreateFrame("Frame", "CleanLootOptionsFrame", UIParent)
-    f:SetSize(230, 316)
+    f:SetSize(230, 384)
     f:SetPoint("CENTER")
     f:SetFrameStrata("DIALOG")
     EnsureBackdropSupport(f)
@@ -1558,13 +2398,13 @@ local function CreateOptionsFrame()
         upBtn:SetChecked(true)
         downBtn:SetChecked(false)
         CleanLootDB.growDirection = "UP"
-        ApplyLayout()
+        LayoutRollFrames()
     end)
     downBtn:SetScript("OnClick", function()
         downBtn:SetChecked(true)
         upBtn:SetChecked(false)
         CleanLootDB.growDirection = "DOWN"
-        ApplyLayout()
+        LayoutRollFrames()
     end)
 
     local skinLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -1634,9 +2474,29 @@ local function CreateOptionsFrame()
         end
     end)
 
+    local hideSpamBtn = CreateFrame("CheckButton", "CleanLootHideSpamButton", f, "UICheckButtonTemplate")
+    hideSpamBtn:SetPoint("TOPLEFT", 14, -254)
+    _G[hideSpamBtn:GetName().."Text"]:SetText(L.OPT_HIDE_SPAM)
+    hideSpamBtn:SetScript("OnClick", function()
+        CleanLootDB.hideRollSpam = hideSpamBtn:GetChecked() and true or false
+    end)
+
+    local detailBtn = CreateFrame("CheckButton", "CleanLootDetailWinsButton", f, "UICheckButtonTemplate")
+    detailBtn:SetPoint("TOPLEFT", 14, -276)
+    _G[detailBtn:GetName().."Text"]:SetText(L.OPT_DETAIL_WINS)
+    detailBtn:SetScript("OnClick", function()
+        CleanLootDB.detailedWins = detailBtn:GetChecked() and true or false
+    end)
+
+    local histBtn = CreateFrame("Button", "CleanLootHistoryButton", f, "UIPanelButtonTemplate")
+    histBtn:SetSize(120, 20)
+    histBtn:SetPoint("TOPLEFT", 16, -300)
+    histBtn:SetText(L.HIST_BTN)
+    histBtn:SetScript("OnClick", function() ToggleHistory() end)
+
     -- Frame scale (0.8 to 1.5, 0.05 steps)
     local scaleSlider = CreateFrame("Slider", "CleanLootScaleSlider", f, "OptionsSliderTemplate")
-    scaleSlider:SetPoint("TOPLEFT", 22, -276)
+    scaleSlider:SetPoint("TOPLEFT", 22, -344)
     scaleSlider:SetWidth(180)
     scaleSlider:SetMinMaxValues(0.8, 1.5)
     scaleSlider:SetValueStep(0.05)
@@ -1666,6 +2526,8 @@ local function CreateOptionsFrame()
         end
     end)
 
+    f.hideSpamBtn = hideSpamBtn
+    f.detailBtn = detailBtn
     f.upBtn, f.downBtn, f.classicBtn, f.elvBtn, f.noConfirmBtn, f.simpleDeleteBtn, f.winRecapBtn, f.scaleSlider =
         upBtn, downBtn, classicBtn, elvBtn, noConfirmBtn, simpleDeleteBtn, winRecapBtn, scaleSlider
     optionsFrame = f
@@ -1686,6 +2548,8 @@ local function ShowOptions()
     f.noConfirmBtn:SetChecked(CleanLootDB.noConfirm and true or false)
     f.simpleDeleteBtn:SetChecked(CleanLootDB.simpleDeleteConfirm and true or false)
     f.winRecapBtn:SetChecked(CleanLootDB.winRecap and true or false)
+    f.hideSpamBtn:SetChecked(CleanLootDB.hideRollSpam and true or false)
+    f.detailBtn:SetChecked(CleanLootDB.detailedWins and true or false)
 
     f.scaleSlider.__init = false
     f.scaleSlider:SetValue(CleanLootDB.frameScale or 1)
@@ -1710,13 +2574,6 @@ local function HandleCommand(msg)
         local ok3, err3 = pcall(ShowWinsTest)
         if not ok3 then PrintError("ShowWinsTest", err3) end
 
-        if CleanLootDB.debugMode and ok1 and testFrame then
-            PrintDiag(L.DIAG_TEST_STATE:format(
-                tostring(testFrame:IsShown()), tostring(testFrame:IsVisible()),
-                testFrame:GetWidth() or 0, testFrame:GetHeight() or 0,
-                testFrame:GetPoint() and "1" or "0"))
-        end
-
         print(MSG .. L.MSG_TEST_OPEN)
     elseif msg == "stop" then
         HideTestFrame()
@@ -1727,6 +2584,8 @@ local function HandleCommand(msg)
         CleanLootDB.winsPoint = nil
         if winsFrame then RestoreWinsPosition() end
         print(MSG .. L.MSG_RESET)
+    elseif msg == "history" then
+        ToggleHistory()
     elseif msg == "options" or msg == "menu" then
         ShowOptions()
     elseif msg == "debugmode" then
@@ -1775,6 +2634,7 @@ local function HandleCommand(msg)
         print(L.HELP_STOP)
         print(L.HELP_RESET)
         print(L.HELP_OPTIONS)
+        print(L.HELP_HISTORY)
         print(L.HELP_DEBUGMODE)
         print(L.HELP_DEBUG)
         print(L.HELP_SCAN)
@@ -1788,64 +2648,6 @@ SlashCmdList["CLEANLOOT"] = HandleCommand
 -------------------------------------------------
 -- Init
 -------------------------------------------------
--- Self-healing: the OnShow/OnHide hooks are installed once per frame
--- (immediate latch, near-infallible operation), but the SKIN is retried
--- on every START_LOOT_ROLL as long as frame.__cleanLootSkinned is not
--- set (it only is after full success). A transient failure at load thus
--- heals itself on the next roll, instead of requiring a
--- reconnect.
-local hookedFrames = {}
-
-local function EnsureFrameHooked(frame)
-    if not frame then return end
-
-    if not hookedFrames[frame] then
-        hookedFrames[frame] = true
-
-        frame:HookScript("OnShow", function(self)
-            -- Catch-up: if the skin failed previously, retry here.
-            if not self.__cleanLootSkinned then
-                local okS, errS = pcall(SkinLootFrame, self)
-                if not okS then PrintError("SkinLootFrame", errS) end
-            end
-
-            DiagnoseFrameState(self)
-
-            local ok1, err1 = pcall(ColorFrameByQuality, self)
-            if not ok1 then PrintError("ColorFrameByQuality", err1) end
-
-            local ok2, err2 = pcall(ApplyFrameLayout, self)
-            if not ok2 then PrintError("ApplyFrameLayout", err2) end
-
-            local ok3, err3 = pcall(ApplyLayout)
-            if not ok3 then PrintError("ApplyLayout", err3) end
-        end)
-
-        -- When a roll resolves, remaining items fill the gap.
-        frame:HookScript("OnHide", function()
-            ApplyLayout()
-        end)
-    end
-
-    if not frame.__cleanLootSkinned then
-        local ok, err = pcall(SkinLootFrame, frame)
-        if not ok then PrintError("SkinLootFrame", err) end
-    end
-end
-
-local watcher = CreateFrame("Frame")
-watcher:RegisterEvent("ADDON_LOADED")
-watcher:RegisterEvent("PLAYER_LOGIN")
-watcher:RegisterEvent("PLAYER_ENTERING_WORLD")
-watcher:RegisterEvent("START_LOOT_ROLL")
-
--- Frame-touching setup runs once per UI session, on PLAYER_ENTERING_WORLD
--- rather than ADDON_LOADED. At /reload time, ADDON_LOADED fires very early
--- while the (custom) client is still rebuilding its UI; hooking, skinning
--- and backdrop-probing Blizzard frames at that exact moment is a plausible
--- trigger for hard client crashes (Error #132) on fragile clients. PEW
--- fires once everything is fully stable, and no loot roll can possibly
--- happen before then.
 local coreInitialized = false
 
 local function InitializeCore()
@@ -1854,16 +2656,24 @@ local function InitializeCore()
 
     ApplyDeleteConfirmOverride()
     SetupAutoConfirm()
+    NeutralizeNativeFrames()
 
-    for i = 1, 4 do
-        EnsureFrameHooked(_G["GroupLootFrame"..i])
+    -- Pre-create the frame pool so the skin is ready before the first roll.
+    for i = 1, NUM_ROLL_FRAMES do
+        GetRollFrame(i)
     end
 
     ApplyFrameScale()
-    ApplyLayout()
 end
 
-watcher:SetScript("OnEvent", function(self, event, arg1)
+local watcher = CreateFrame("Frame")
+watcher:RegisterEvent("ADDON_LOADED")
+watcher:RegisterEvent("PLAYER_LOGIN")
+watcher:RegisterEvent("PLAYER_ENTERING_WORLD")
+watcher:RegisterEvent("START_LOOT_ROLL")
+watcher:RegisterEvent("CANCEL_LOOT_ROLL")
+
+watcher:SetScript("OnEvent", function(self, event, arg1, arg2)
     if event == "ADDON_LOADED" and arg1 == ADDON_NAME then
         -- Pure Lua only here (defaults + skin table): zero frame API calls
         -- during the early, fragile phase of a UI (re)load.
@@ -1873,28 +2683,22 @@ watcher:SetScript("OnEvent", function(self, event, arg1)
         if CleanLootDB.simpleDeleteConfirm == nil then CleanLootDB.simpleDeleteConfirm = false end
         if CleanLootDB.debugMode == nil then CleanLootDB.debugMode = false end
         if CleanLootDB.winRecap == nil then CleanLootDB.winRecap = true end
+        if CleanLootDB.hideRollSpam == nil then CleanLootDB.hideRollSpam = false end
+        if CleanLootDB.detailedWins == nil then CleanLootDB.detailedWins = false end
         if CleanLootDB.frameScale == nil then CleanLootDB.frameScale = 1 end
         CopySkin(CleanLootDB.skin)
     elseif event == "PLAYER_ENTERING_WORLD" then
+        -- Frame work deferred to PEW (UI fully rebuilt), avoids Error #132.
         InitializeCore()
     elseif event == "PLAYER_LOGIN" then
-        -- Some CVars are only reliably readable at login time.
         EnsureLootSpamCVar()
     elseif event == "START_LOOT_ROLL" then
         InitializeCore()
-        -- Guaranteed catch-up: the frames necessarily exist at this point, and
-        -- any previously failed skin is retried here.
-        for i = 1, 4 do
-            local frame = _G["GroupLootFrame"..i]
-            EnsureFrameHooked(frame)
-            if frame and frame:IsShown() then
-                local ok1, err1 = pcall(ColorFrameByQuality, frame)
-                if not ok1 then PrintError("ColorFrameByQuality", err1) end
-                local ok2, err2 = pcall(ApplyFrameLayout, frame)
-                if not ok2 then PrintError("ApplyFrameLayout", err2) end
-            end
-        end
-        ApplyFrameScale()
-        ApplyLayout()
+        local rollID, rollTime = arg1, arg2
+        local ok, err = pcall(StartRollFrame, rollID, rollTime)
+        if not ok then PrintError("StartRollFrame", err) end
+    elseif event == "CANCEL_LOOT_ROLL" then
+        local ok, err = pcall(StopRollFrame, arg1)
+        if not ok then PrintError("StopRollFrame", err) end
     end
 end)

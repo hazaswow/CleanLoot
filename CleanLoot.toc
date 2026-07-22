@@ -1,9 +1,9 @@
 ## Interface: 30300
 ## Title: CleanLoot
-## Notes: Clean, ElvUI-inspired reskin of the group loot roll frames (Need/Greed/Disenchant/Pass). Standalone, no ElvUI required. Movable, stack direction, quality-colored borders, roll tooltips, optional popup skipping.
-## Notes-frFR: Reskin epure des fenetres de loot roll (Need/Greed/Disenchant/Pass), inspire d'ElvUI. Autonome, sans ElvUI. Repositionnable, direction d'empilement, bordures colorees par qualite, tooltips de roll, popups optionnellement ignorees.
+## Notes: Clean, lightweight loot roll frames (Need/Greed/Disenchant/Pass) with classic and ElvUI-inspired skins. Standalone, no ElvUI required. Movable, stack direction, quality-colored borders, roll tooltips, roll winners recap, session roll history, and optional popup skipping.
+## Notes-frFR: Fenetres de loot roll legeres (Need/Greed/Disenchant/Pass) avec skins classique et inspire d'ElvUI. Autonome, sans ElvUI. Repositionnable, direction d'empilement, bordures par qualite, tooltips de roll, recap des gagnants, historique de session, popups optionnellement ignorees.
 ## Author: Hazas
-## Version: 2.3.3
+## Version: 3.3.0
 ## SavedVariables: CleanLootDB
 
 CleanLoot.lua
