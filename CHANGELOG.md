@@ -1,5 +1,22 @@
 # Changelog
 
+## 4.0.0
+Cumulative milestone release. No architecture break — SavedVariables stay compatible with 3.3.0.
+
+**New features**
+- Combined roll log: the separate winners recap and session history are replaced by a single window listing every item, with every group member's vote. Unresolved items stay expanded; resolved ones collapse and sort Need > Greed/Disenchant > Pass, then value. Open it with `/cll history` or from the minimap button.
+- Ephemeral winner popup (12s) when an item resolves and the log window is closed; click it to open the log.
+- Per-item auto-roll rules: right-click a roll button to always roll a given way for that item (rolls immediately, with a chat confirmation). Manage rules from the new rules window (`/cll arr` or `/cll rules`) — add by name/ID, change type, delete, grouped by roll type. A per-item rule takes priority over global auto-greed.
+- Masking: when an auto-roll rule or auto-greed applies and is available, the roll frame never appears at all — it rolls silently.
+- Live vote counters on each Need/Greed/Disenchant button, with a mouseover tooltip showing who voted — works even while the button is grayed out.
+- Auto-greed / auto-DE on green (uncommon) items, configurable independently from per-item rules.
+- Minimap button (LibDBIcon + LibDataBroker): left-click opens the roll log, right-click opens test mode; hideable from the Interface options page.
+- Options panel reorganized into two columns with gold section titles, ElvUI-skinned buttons, and a structured "About" quick guide with per-feature config hints.
+
+**Fixed / internal**
+- Roll log capture reworked around a name-indexed entry model (`StartNewLogEntry` for fresh drops, `GetActiveLogEntry` for chat updates) to avoid duplicate-item pollution from this server's unreliable roll IDs.
+- ~478 lines of dead code from the old separate recap/history/reskin implementation removed.
+
 ## 3.3.0
 Major update. The addon no longer reskins Blizzard's loot roll frames — it now renders its own, which eliminates a whole class of native-frame glitches.
 
