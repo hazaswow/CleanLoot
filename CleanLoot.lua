@@ -371,7 +371,7 @@ local SKINS = {
         hideCornerAlways      = true,
         cornerMinQuality      = nil,
         compact         = true,
-        frameSize       = { 210, 64 },
+        frameSize       = { 224, 70 },
     },
 }
 
@@ -389,13 +389,13 @@ local BUTTON_LABELS = {
 }
 
 local COMPACT_METRICS = {
-    iconSize     = 26,
+    iconSize     = 28,
     iconPos      = { 4, -4 },
-    namePos      = { 34, -6 },
+    namePos      = { 36, -6 },
     barInset     = 4,
-    barHeight    = 7,
-    buttonHeight = 14,
-    buttonTop    = { 4, -33 },
+    barHeight    = 8,
+    buttonHeight = 15,
+    buttonTop    = { 4, -36 },
 }
 
 local currentSkin = {}
@@ -3168,10 +3168,10 @@ watcher:SetScript("OnEvent", function(self, event, arg1, arg2)
         -- during the early, fragile phase of a UI (re)load.
         CleanLootDB.growDirection = CleanLootDB.growDirection or "DOWN"
         CleanLootDB.skin = CleanLootDB.skin or "classic"
-        if CleanLootDB.noConfirm == nil then CleanLootDB.noConfirm = false end
-        if CleanLootDB.simpleDeleteConfirm == nil then CleanLootDB.simpleDeleteConfirm = false end
+        if CleanLootDB.noConfirm == nil then CleanLootDB.noConfirm = true end
+        if CleanLootDB.simpleDeleteConfirm == nil then CleanLootDB.simpleDeleteConfirm = true end
         if CleanLootDB.debugMode == nil then CleanLootDB.debugMode = false end
-        if CleanLootDB.hideRollSpam == nil then CleanLootDB.hideRollSpam = false end
+        if CleanLootDB.hideRollSpam == nil then CleanLootDB.hideRollSpam = true end
         if CleanLootDB.autoGreen == nil then CleanLootDB.autoGreen = "off" end
         if CleanLootDB.autoOpenRecap == nil then CleanLootDB.autoOpenRecap = false end
         if CleanLootDB.winnerPopup == nil then CleanLootDB.winnerPopup = true end

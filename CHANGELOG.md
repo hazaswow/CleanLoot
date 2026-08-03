@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.2
+- Changed fresh-install defaults: "Hide roll messages from chat", "Skip popups (roll/BoP)" and "Simple Delete confirmation" now start checked. Existing installs keep whatever they already have saved.
+- ElvUI-inspired skin: the loot roll frame is very slightly bigger (224x70 instead of 210x64, icon 26->28px, timer bar 7->8px, buttons 14->15px tall). Other windows (roll log, rules, options) are unaffected.
+
 ## 4.0.1
 - Fixed: rolling Need/Greed/Disenchant/Pass could occasionally register on the wrong item during a busy loot burst. Roll buttons now snapshot their target roll on mouse-down instead of re-reading it on click, so a roll that resolves on its own (someone else finishes rolling, timer runs out) and gets its frame slot immediately reassigned to a new item can no longer hijack a click that was already in progress. (Reported by Skeleth: clicking Pass sometimes passed a different item, with upward stacking / ElvUI skin / 0.9 scale.)
 
