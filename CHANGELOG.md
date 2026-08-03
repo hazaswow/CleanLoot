@@ -1,5 +1,8 @@
 # Changelog
 
+## 4.0.1
+- Fixed: rolling Need/Greed/Disenchant/Pass could occasionally register on the wrong item during a busy loot burst. Roll buttons now snapshot their target roll on mouse-down instead of re-reading it on click, so a roll that resolves on its own (someone else finishes rolling, timer runs out) and gets its frame slot immediately reassigned to a new item can no longer hijack a click that was already in progress. (Reported by Skeleth: clicking Pass sometimes passed a different item, with upward stacking / ElvUI skin / 0.9 scale.)
+
 ## 4.0.0
 Cumulative milestone release. No architecture break — SavedVariables stay compatible with 3.3.0.
 

@@ -3,7 +3,7 @@
 ## Notes: Clean, lightweight loot roll frames (Need/Greed/Disenchant/Pass) with classic and ElvUI-inspired skins. Standalone, no ElvUI required. Movable, stack direction, quality-colored borders, live vote counters, combined roll log, per-item auto-roll rules, minimap button, and optional popup skipping.
 ## Notes-frFR: Fenetres de loot roll legeres (Need/Greed/Disenchant/Pass) avec skins classique et inspire d'ElvUI. Autonome, sans ElvUI. Repositionnable, direction d'empilement, bordures par qualite, compteurs de votes en direct, journal des rolls combine, regles d'auto-roll par objet, bouton minimap, et popups optionnellement ignorees.
 ## Author: Hazas
-## Version: 4.0.0
+## Version: 4.0.1
 ## SavedVariables: CleanLootDB
 
 Libs\LibStub\LibStub.lua

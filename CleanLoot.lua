@@ -1370,8 +1370,17 @@ local function CreateRollFrame(index)
         btn.__countFS = countFS
 
         btn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+        -- Snapshot the target rollID on mouse-DOWN, not on click (mouse-up).
+        -- Between the two, this pooled frame's roll can resolve on its own
+        -- (someone else finishes rolling, or the timer runs out) and get
+        -- immediately reassigned to a brand new item that just dropped —
+        -- without this, OnClick would re-read f.rollID and vote on that new
+        -- item instead of the one the player actually clicked.
+        btn:SetScript("OnMouseDown", function(self)
+            self.__clickRollID = f.rollID
+        end)
         btn:SetScript("OnClick", function(self, mouseButton)
-            local id = f.rollID
+            local id = self.__clickRollID
             if not (id and id >= 0) then return end
             if mouseButton == "RightButton" then
                 -- Create a per-item auto-roll rule for THIS choice, then roll
