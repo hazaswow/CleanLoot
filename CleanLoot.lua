@@ -935,11 +935,12 @@ local function ResolveLogEntry(itemName, winnerName)
     -- Fire the ephemeral winner popup (only shows if enabled and the big
     -- log window is closed; handled inside NotifyWinnerPopup).
     if NotifyWinnerPopup then
-        local winValue
+        local winValue, winType
         if e.sortedRows and e.sortedRows[1] and e.sortedRows[1].name == winnerName then
             winValue = e.sortedRows[1].value
+            winType = e.sortedRows[1].type
         end
-        NotifyWinnerPopup(e.link or ("["..(e.name or "item").."]"), winnerName, winValue, e.icon)
+        NotifyWinnerPopup(e.link or ("["..(e.name or "item").."]"), winnerName, winValue, e.icon, nil, winType)
     end
 end
 
@@ -2148,9 +2149,15 @@ local function CreateWinnerPopup()
     f:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     f.__lines = {}
+    f.__lineIcons = {}
     for i = 1, WINNER_POPUP_MAX do
+        local icon = f:CreateTexture(nil, "ARTWORK")
+        icon:SetSize(12, 12)
+        icon:SetPoint("TOPLEFT", f, "TOPLEFT", 6, -5 - (i - 1) * 15)
+        f.__lineIcons[i] = icon
+
         local fs = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        fs:SetPoint("TOPLEFT", f, "TOPLEFT", 6, -4 - (i - 1) * 15)
+        fs:SetPoint("LEFT", icon, "RIGHT", 3, 0)
         fs:SetPoint("RIGHT", f, "RIGHT", -6, 0)
         fs:SetJustifyH("LEFT")
         ApplyFont(fs)
@@ -2183,15 +2190,23 @@ RefreshWinnerPopup = function()
     if #winnerLines == 0 then f:Hide(); return end
     for i = 1, WINNER_POPUP_MAX do
         local fs = f.__lines[i]
+        local icon = f.__lineIcons[i]
         local entry = winnerLines[i]
-        if entry then fs:SetText(entry.text); fs:Show() else fs:Hide() end
+        if entry then
+            fs:SetText(entry.text)
+            fs:Show()
+            if entry.icon then icon:SetTexture(entry.icon); icon:Show() else icon:Hide() end
+        else
+            fs:Hide()
+            icon:Hide()
+        end
     end
     f.__topLink = winnerLines[1] and winnerLines[1].link
     f:SetHeight(8 + math.min(#winnerLines, WINNER_POPUP_MAX) * 15)
     f:Show()
 end
 
-NotifyWinnerPopup = function(displayLink, winnerName, winValue, icon, force)
+NotifyWinnerPopup = function(displayLink, winnerName, winValue, icon, force, winType)
     if not force and not CleanLootDB.winnerPopup then return end
     -- Only when the big log window is closed (unless forced, e.g. test mode).
     if not force and logFrame and logFrame:IsShown() then return end
@@ -2206,6 +2221,7 @@ NotifyWinnerPopup = function(displayLink, winnerName, winValue, icon, force)
     table.insert(winnerLines, 1, {
         text = text,
         link = displayLink and displayLink:match("|H(item:[^|]+)|h") and displayLink or nil,
+        icon = winType and ICON_BY_TYPE[winType],
         expires = GetTime() + WINNER_POPUP_DURATION,
     })
     while #winnerLines > WINNER_POPUP_MAX do table.remove(winnerLines) end
@@ -2867,7 +2883,7 @@ local function StartTestMode()
     -- though the log window is open during test mode.
     if NotifyWinnerPopup then
         local me = UnitName("player") or "You"
-        NotifyWinnerPopup("["..(L.TEST_ITEM or "Test item").."]", me, 92, nil, true)
+        NotifyWinnerPopup("["..(L.TEST_ITEM or "Test item").."]", me, 92, nil, true, "Need")
     end
     print(MSG .. L.MSG_TEST_OPEN)
 end

@@ -1,5 +1,8 @@
 # Changelog
 
+## 4.0.3
+- Fixed: the winner popup lost its roll type icon (Need/Greed/Disenchant/Pass) somewhere along the way, showing only the winner's name and roll value. The icon is back, matching what the full roll log already showed.
+
 ## 4.0.2
 - Changed fresh-install defaults: "Hide roll messages from chat", "Skip popups (roll/BoP)" and "Simple Delete confirmation" now start checked. Existing installs keep whatever they already have saved.
 - ElvUI-inspired skin: the loot roll frame is very slightly bigger (224x70 instead of 210x64, icon 26->28px, timer bar 7->8px, buttons 14->15px tall). Other windows (roll log, rules, options) are unaffected.
