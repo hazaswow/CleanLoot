@@ -1,5 +1,8 @@
 # Changelog
 
+## 4.0.7
+- Fixed: auto-roll (per-item rules and auto-greed) could mask the item without ever actually submitting a roll. The addon was deferring the `RollOnLoot` call by 0.1s through an OnUpdate ticker for no functional reason -- long enough, in some cases, for the roll to get cancelled or resolved server-side before the call ran, silently doing nothing. It's now called immediately and synchronously in the same tick as `START_LOOT_ROLL`, like a real click would.
+
 ## 4.0.6
 - Added a real scrollbar to the auto-roll rules window -- it was hard-capped at 12 visible rows with no way to reach anything beyond that (e.g. 21 Need rules would cut off after the first 11).
 - Fixed: `/cll test` forces the roll log window open to preview the winner popup demo, but `/cll stop` never closed it back if it had been closed beforehand -- it now restores whatever state the log window was in before test mode started.

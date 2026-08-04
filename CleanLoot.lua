@@ -1726,24 +1726,23 @@ local function StartRollFrame(rollID, rollTime)
     if autoType ~= nil then
         f.rollID = nil                       -- release the frame we reserved
         rollFrameByRollID[rollID] = nil
-        local rid = rollID
         if CleanLootDB.debugMode then
             print(MSG .. ("[debug] auto-roll: %s on '%s' (rollID %s)"):format(
-                ROLLTYPE_NAME[autoType] or "?", tostring(name), tostring(rid)))
+                ROLLTYPE_NAME[autoType] or "?", tostring(name), tostring(rollID)))
         end
-        local waiter = CreateFrame("Frame")
-        local acc = 0
-        waiter:SetScript("OnUpdate", function(self, e)
-            acc = acc + (e or 0)
-            if acc < 0.1 then return end
-            self:SetScript("OnUpdate", nil)
-            local ok, err = pcall(RollOnLoot, rid, autoType)
-            if not ok then
-                PrintError("RollOnLoot (auto)", err)
-            elseif CleanLootDB.debugMode then
-                print(MSG .. ("[debug] RollOnLoot(%s, %s) submitted"):format(tostring(rid), tostring(autoType)))
-            end
-        end)
+        -- Roll immediately, synchronously, in the same tick as START_LOOT_ROLL
+        -- (like a real click would). The previous version deferred this by
+        -- 0.1s through an OnUpdate ticker for no functional reason, which
+        -- left a window for the roll to get cancelled/resolved server-side
+        -- before RollOnLoot ever actually ran -- a silent miss with no error,
+        -- since calling RollOnLoot on a roll that's no longer live just does
+        -- nothing.
+        local ok, err = pcall(RollOnLoot, rollID, autoType)
+        if not ok then
+            PrintError("RollOnLoot (auto)", err)
+        elseif CleanLootDB.debugMode then
+            print(MSG .. ("[debug] RollOnLoot(%s, %s) submitted"):format(tostring(rollID), tostring(autoType)))
+        end
         return
     end
 
