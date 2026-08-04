@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.6
+- Added a real scrollbar to the auto-roll rules window -- it was hard-capped at 12 visible rows with no way to reach anything beyond that (e.g. 21 Need rules would cut off after the first 11).
+- Fixed: `/cll test` forces the roll log window open to preview the winner popup demo, but `/cll stop` never closed it back if it had been closed beforehand -- it now restores whatever state the log window was in before test mode started.
+
 ## 4.0.5
 - Fixed: "Hide roll messages from chat" was a saved setting nobody ever read -- it never actually filtered anything. It now installs a CHAT_MSG_LOOT message filter that hides the roll choice/value/win spam lines while leaving the addon's own parsing (log, recap, tooltips) untouched.
 - Added: the addon version now shows in the options window title ("CleanLoot - Options (vX.X.X)") and in the minimap button tooltip ("CleanLoot vX.X.X").

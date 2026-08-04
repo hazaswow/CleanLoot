@@ -1861,7 +1861,11 @@ end
 
 -- Recap test mode: a dummy (non-expiring) entry to preview and reposition
 -- the window, on the same cycle as the loot roll mover.
+local logOpenBeforeTest = false
 local function ShowWinsTest()
+    -- Remember whether the log was already open, so leaving test mode can
+    -- restore that state instead of always leaving it open.
+    logOpenBeforeTest = logFrame and logFrame:IsShown() or false
     -- Populate the combined log with a fake resolved item and open the window.
     local me = ME_DISPLAY_NAME
     local testName = L.TEST_ITEM or "Test item"
@@ -1892,6 +1896,11 @@ local function HideWinsTest()
             table.remove(rollLog, i)
             if nm then rollLogByName[nm] = nil end
         end
+    end
+    -- Restore whatever state the log window was in before test mode opened
+    -- it for the preview, instead of always leaving it open.
+    if not logOpenBeforeTest and logFrame and logFrame:IsShown() then
+        logFrame:Hide()
     end
     if RefreshRollLogWindow then RefreshRollLogWindow() end
 end
@@ -2329,7 +2338,7 @@ local RULE_TYPE_CYCLE = { [1] = 2, [2] = 3, [3] = 0, [0] = 1 }  -- Need->Greed->
 local function CreateRulesFrame()
     if rulesFrame then return rulesFrame end
     local f = CreateFrame("Frame", "CleanLootRulesFrame", UIParent)
-    f:SetSize(340, 60 + RULES_VISIBLE * RULES_ROW_H + 60)
+    f:SetSize(360, 60 + RULES_VISIBLE * RULES_ROW_H + 60)
     f:SetPoint("CENTER", UIParent, "CENTER", 0, 40)
     f:SetFrameStrata("DIALOG")
     EnsureBackdropSupport(f)
@@ -2352,6 +2361,15 @@ local function CreateRulesFrame()
     local closeBtn = CreateFrame("Button", nil, f, "UIPanelCloseButton")
     closeBtn:SetPoint("TOPRIGHT", -6, -6)
     SkinElvCloseButton(closeBtn)
+
+    -- Scrollbar over the row list (rules can exceed RULES_VISIBLE rows).
+    local scroll = CreateFrame("ScrollFrame", "CleanLootRulesScroll", f, "FauxScrollFrameTemplate")
+    scroll:SetPoint("TOPLEFT", 16, -44)
+    scroll:SetPoint("BOTTOMRIGHT", -28, 60)
+    scroll:SetScript("OnVerticalScroll", function(self, offset)
+        FauxScrollFrame_OnVerticalScroll(self, offset, RULES_ROW_H, function() RefreshRulesWindow() end)
+    end)
+    f.__scroll = scroll
 
     -- Rows (item name + type button + remove button).
     f.__rows = {}
@@ -2503,8 +2521,11 @@ RefreshRulesWindow = function()
         end
     end
 
+    FauxScrollFrame_Update(f.__scroll, #display, RULES_VISIBLE, RULES_ROW_H)
+    local offset = FauxScrollFrame_GetOffset(f.__scroll)
+
     for i, row in ipairs(f.__rows) do
-        local d = display[i]
+        local d = display[offset + i]
         if d and d.isHeader then
             -- Group header: "[+/-] Type (count)", clickable to fold.
             local arrow = d.expanded and "-" or "+"
