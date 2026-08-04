@@ -1,5 +1,10 @@
 # Changelog
 
+## 4.0.5
+- Fixed: "Hide roll messages from chat" was a saved setting nobody ever read -- it never actually filtered anything. It now installs a CHAT_MSG_LOOT message filter that hides the roll choice/value/win spam lines while leaving the addon's own parsing (log, recap, tooltips) untouched.
+- Added: the addon version now shows in the options window title ("CleanLoot - Options (vX.X.X)") and in the minimap button tooltip ("CleanLoot vX.X.X").
+- Hardened the auto-roll path: a failed RollOnLoot call is no longer silently swallowed (surfaces as an error like any other roll failure), and /cll debugmode now traces the auto-roll decision, the roll submission, win message matching, and why the winner popup did or didn't show -- useful for tracking down the reported case where the popup doesn't appear for rule/auto-greed items.
+
 ## 4.0.4
 - Fixed: the local player could show up in the roll log under their character name in one row and literally "You" in another for the same roll, because some of this server's self-roll chat messages fall back to the generic "other player" pattern with "You" already baked into the captured text. Every name capture point (roll choice, roll value, win message, group roster) now normalizes to a single canonical name.
 - The local player is now always displayed as "You" in the roll log and the winner popup, colored gold to stand out from other players.

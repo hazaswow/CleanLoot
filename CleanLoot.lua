@@ -3,6 +3,7 @@
 -- No ElvUI dependency. Compatible with 3.3.5 (Ascension / Conquest of Azeroth).
 
 local ADDON_NAME = ...
+local ADDON_VERSION = (GetAddOnMetadata and GetAddOnMetadata(ADDON_NAME, "Version")) or "?"
 
 CleanLootDB = CleanLootDB or {}
 
@@ -807,6 +808,26 @@ do
 end
 
 
+-- "Hide roll messages from chat": filters the roll choice/value/win spam out
+-- of the chat frame while leaving CHAT_MSG_LOOT itself untouched, so the
+-- addon's own parsing (recap, log, tooltips) keeps receiving every line.
+local function RollSpamFilter(self, event, msg, ...)
+    if not CleanLootDB.hideRollSpam or not msg then return false end
+    for _, def in ipairs(ROLL_CHOICE_PATTERNS) do
+        if msg:match(def.pattern) then return true end
+    end
+    for _, def in ipairs(rollValuePatterns) do
+        if msg:match(def.pattern) then return true end
+    end
+    for _, def in ipairs(WIN_PATTERNS) do
+        if msg:match(def.pattern) then return true end
+    end
+    return false
+end
+if ChatFrame_AddMessageEventFilter then
+    ChatFrame_AddMessageEventFilter("CHAT_MSG_LOOT", RollSpamFilter)
+end
+
 -- Session history: newest first, capped. Each entry captured when a roll is
 -- won or fully resolved: { itemLink, winner, winType, winValue, rolls = {...} }.
 local rollItemLinks = {}   -- rollID -> item link (for history/detail display)
@@ -951,7 +972,17 @@ local NotifyWinnerPopup  -- forward (defined with the popup)
 
 local function ResolveLogEntry(itemName, winnerName)
     local e = rollLogByName[itemName]
-    if not e then return end
+    if not e then
+        if CleanLootDB.debugMode then
+            print(MSG .. ("[debug] ResolveLogEntry: no log entry for '%s' (winner %s) -- win message dropped"):format(
+                tostring(itemName), tostring(winnerName)))
+        end
+        return
+    end
+    if e.resolved and CleanLootDB.debugMode then
+        print(MSG .. ("[debug] ResolveLogEntry: '%s' was already resolved (winner was %s), overwriting with %s"):format(
+            tostring(itemName), tostring(e.winner), tostring(winnerName)))
+    end
     e.resolved = true
     e.expanded = false
     e.winner = winnerName
@@ -1696,13 +1727,22 @@ local function StartRollFrame(rollID, rollTime)
         f.rollID = nil                       -- release the frame we reserved
         rollFrameByRollID[rollID] = nil
         local rid = rollID
+        if CleanLootDB.debugMode then
+            print(MSG .. ("[debug] auto-roll: %s on '%s' (rollID %s)"):format(
+                ROLLTYPE_NAME[autoType] or "?", tostring(name), tostring(rid)))
+        end
         local waiter = CreateFrame("Frame")
         local acc = 0
         waiter:SetScript("OnUpdate", function(self, e)
             acc = acc + (e or 0)
             if acc < 0.1 then return end
             self:SetScript("OnUpdate", nil)
-            pcall(RollOnLoot, rid, autoType)
+            local ok, err = pcall(RollOnLoot, rid, autoType)
+            if not ok then
+                PrintError("RollOnLoot (auto)", err)
+            elseif CleanLootDB.debugMode then
+                print(MSG .. ("[debug] RollOnLoot(%s, %s) submitted"):format(tostring(rid), tostring(autoType)))
+            end
         end)
         return
     end
@@ -1865,6 +1905,10 @@ HandleWinMessage = function(text)
         if capture then
             local playerName = def.isSelf and ME_DISPLAY_NAME or NormalizePlayerName(capture)
             local itemName = text:match("%[(.-)%]")
+            if CleanLootDB.debugMode then
+                print(MSG .. ("[debug] win message matched: '%s' -> item='%s' winner='%s'"):format(
+                    text, tostring(itemName), tostring(playerName)))
+            end
 
             -- Make sure any last-moment roll values are captured, then resolve
             -- the combined-log entry (collapses it, sorts, marks winner).
@@ -2234,9 +2278,23 @@ RefreshWinnerPopup = function()
 end
 
 NotifyWinnerPopup = function(displayLink, winnerName, winValue, icon, force, winType)
-    if not force and not CleanLootDB.winnerPopup then return end
+    if not force and not CleanLootDB.winnerPopup then
+        if CleanLootDB.debugMode then
+            print(MSG .. "[debug] winner popup suppressed: option disabled")
+        end
+        return
+    end
     -- Only when the big log window is closed (unless forced, e.g. test mode).
-    if not force and logFrame and logFrame:IsShown() then return end
+    if not force and logFrame and logFrame:IsShown() then
+        if CleanLootDB.debugMode then
+            print(MSG .. "[debug] winner popup suppressed: log window is open")
+        end
+        return
+    end
+    if CleanLootDB.debugMode then
+        print(MSG .. ("[debug] winner popup: winner='%s' value=%s type=%s"):format(
+            tostring(winnerName), tostring(winValue), tostring(winType)))
+    end
     CreateWinnerPopup()
     local who = ColorizeMe(winnerName or "?")
     local text
@@ -2630,7 +2688,7 @@ local function CreateOptionsFrame()
 
     local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     title:SetPoint("TOP", 0, -16)
-    title:SetText(L.OPT_TITLE)
+    title:SetText(("%s (v%s)"):format(L.OPT_TITLE, ADDON_VERSION))
 
     local dirLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     dirLabel:SetPoint("TOPLEFT", 16, -40)
@@ -3075,7 +3133,7 @@ local function SetupMinimapButton()
             end
         end,
         OnTooltipShow = function(tt)
-            tt:AddLine("CleanLoot")
+            tt:AddLine(("CleanLoot v%s"):format(ADDON_VERSION))
             tt:AddLine(L.MINIMAP_TT_LEFT, 1, 1, 1)
             tt:AddLine(L.MINIMAP_TT_RIGHT, 1, 1, 1)
         end,
