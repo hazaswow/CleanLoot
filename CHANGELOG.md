@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.4
+- Fixed: the local player could show up in the roll log under their character name in one row and literally "You" in another for the same roll, because some of this server's self-roll chat messages fall back to the generic "other player" pattern with "You" already baked into the captured text. Every name capture point (roll choice, roll value, win message, group roster) now normalizes to a single canonical name.
+- The local player is now always displayed as "You" in the roll log and the winner popup, colored gold to stand out from other players.
+
 ## 4.0.3
 - Fixed: the winner popup lost its roll type icon (Need/Greed/Disenchant/Pass) somewhere along the way, showing only the winner's name and roll value. The icon is back, matching what the full roll log already showed.
 

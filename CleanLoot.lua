@@ -827,23 +827,48 @@ local rollLogByName = {}            -- item name -> entry (for live updates)
 
 local ROLL_PRIORITY = { Need = 1, Greed = 2, Disenchant = 2, Pass = 3, Waiting = 4 }
 
+-- Canonical display name for the local player everywhere in the roll log.
+-- On this server, the self-specific chat globals (LOOT_ROLL_NEED_SELF etc.)
+-- are sometimes missing, so the local player's own roll choice/value falls
+-- through to the "other player" pattern with the literal word "You" already
+-- captured as the name -- while the roster prefill and other paths use the
+-- real character name. That mismatch is what caused the same person to show
+-- up as "You" in one row and their character name in another. Every place
+-- that resolves a chat-captured name for the local player routes through
+-- this so there is exactly one key, always "You".
+local ME_DISPLAY_NAME = "You"
+local function NormalizePlayerName(name)
+    if not name then return name end
+    if name == ME_DISPLAY_NAME then return ME_DISPLAY_NAME end
+    local realMe = UnitName("player")
+    if realMe and name == realMe then return ME_DISPLAY_NAME end
+    return name
+end
+
+-- Same gold used elsewhere for accented labels (e.g. the About panel headers).
+local ME_NAME_COLOR = "|cffffd200"
+local function ColorizeMe(name)
+    if name == ME_DISPLAY_NAME then return ME_NAME_COLOR..name.."|r" end
+    return name
+end
+
 -- Snapshot the current party/raid roster (names), to pre-fill every item's
 -- rows with "waiting" players (option A). Non-rollers are pruned on resolve.
 local function GetGroupRoster()
     local names = {}
-    local me = UnitName("player")
-    if me then table.insert(names, me) end
+    local realMe = UnitName("player")
+    if realMe then table.insert(names, ME_DISPLAY_NAME) end
     local nRaid = (GetNumRaidMembers and GetNumRaidMembers()) or 0
     local nParty = (GetNumPartyMembers and GetNumPartyMembers()) or 0
     if nRaid > 0 then
         for i = 1, nRaid do
             local n = UnitName("raid"..i)
-            if n and n ~= me then table.insert(names, n) end
+            if n and n ~= realMe then table.insert(names, n) end
         end
     elseif nParty > 0 then
         for i = 1, nParty do
             local n = UnitName("party"..i)
-            if n then table.insert(names, n) end
+            if n and n ~= realMe then table.insert(names, n) end
         end
     end
     return names
@@ -986,6 +1011,7 @@ rollChoiceWatcher:SetScript("OnEvent", function(self, event, arg1)
         for _, def in ipairs(rollValuePatterns) do
             local value, itemName, player = text:match(def.pattern)
             if value and player then
+                player = NormalizePlayerName(player)
                 local bare = itemName and itemName:match("%[(.-)%]") or itemName
                 if bare then
                     if not rollValuesByName[bare] then rollValuesByName[bare] = {} end
@@ -1002,7 +1028,7 @@ rollChoiceWatcher:SetScript("OnEvent", function(self, event, arg1)
         for _, def in ipairs(ROLL_CHOICE_PATTERNS) do
             local capture = text:match(def.pattern)
             if capture then
-                local playerName = def.isSelf and UnitName("player") or capture
+                local playerName = def.isSelf and ME_DISPLAY_NAME or NormalizePlayerName(capture)
                 local itemName = text:match("%[(.-)%]")
                 local rollID = FindRollIDByItemName(itemName)
                 if rollID then
@@ -1797,7 +1823,7 @@ end
 -- the window, on the same cycle as the loot roll mover.
 local function ShowWinsTest()
     -- Populate the combined log with a fake resolved item and open the window.
-    local me = UnitName("player") or "You"
+    local me = ME_DISPLAY_NAME
     local testName = L.TEST_ITEM or "Test item"
     local e = StartNewLogEntry(testName, nil)
     e.players = {}
@@ -1837,7 +1863,7 @@ HandleWinMessage = function(text)
     for _, def in ipairs(WIN_PATTERNS) do
         local capture = text:match(def.pattern)
         if capture then
-            local playerName = def.isSelf and (UnitName("player") or "?") or capture
+            local playerName = def.isSelf and ME_DISPLAY_NAME or NormalizePlayerName(capture)
             local itemName = text:match("%[(.-)%]")
 
             -- Make sure any last-moment roll values are captured, then resolve
@@ -1880,7 +1906,7 @@ local function BuildLogRows()
         if e.link and not e.link:find("|H") then nameText = "["..e.name.."]" end
         local header
         if e.resolved and e.winner then
-            header = ("%s %s  (%s)"):format(arrow, nameText, e.winner)
+            header = ("%s %s  (%s)"):format(arrow, nameText, ColorizeMe(e.winner))
         elseif e.resolved then
             header = ("%s %s  (%s)"):format(arrow, nameText, L.EVERYONE_PASSED or "-")
         else
@@ -1904,12 +1930,13 @@ local function BuildLogRows()
             end
             for _, p in ipairs(prows) do
                 local label
+                local displayName = ColorizeMe(p.name)
                 if p.type == "Waiting" or not p.type then
-                    label = ("%s  -  ..."):format(p.name)
+                    label = ("%s  -  ..."):format(displayName)
                 elseif p.value then
-                    label = ("%s  -  %d"):format(p.name, p.value)
+                    label = ("%s  -  %d"):format(displayName, p.value)
                 else
-                    label = ("%s"):format(p.name)
+                    label = ("%s"):format(displayName)
                 end
                 table.insert(rows, {
                     isPlayer = true,
@@ -2211,7 +2238,7 @@ NotifyWinnerPopup = function(displayLink, winnerName, winValue, icon, force, win
     -- Only when the big log window is closed (unless forced, e.g. test mode).
     if not force and logFrame and logFrame:IsShown() then return end
     CreateWinnerPopup()
-    local who = winnerName or "?"
+    local who = ColorizeMe(winnerName or "?")
     local text
     if winValue then
         text = ("%s - %d: %s"):format(who, winValue, displayLink)
@@ -2882,8 +2909,7 @@ local function StartTestMode()
     -- Force the winner popup with a demo line so it can be positioned even
     -- though the log window is open during test mode.
     if NotifyWinnerPopup then
-        local me = UnitName("player") or "You"
-        NotifyWinnerPopup("["..(L.TEST_ITEM or "Test item").."]", me, 92, nil, true, "Need")
+        NotifyWinnerPopup("["..(L.TEST_ITEM or "Test item").."]", ME_DISPLAY_NAME, 92, nil, true, "Need")
     end
     print(MSG .. L.MSG_TEST_OPEN)
 end
