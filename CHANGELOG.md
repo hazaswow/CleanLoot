@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.8
+- Auto-rolled items (per-item rule or auto-greed) now trigger a small notification in the winner popup: "Auto-rolled [roll type icon] [item icon] Item name" -- so a masked item that never shows a frame still gives visible confirmation something happened. Same rules as the existing winner popup (option enabled, log window closed).
+- The winner popup now also shows the item's own icon next to each line (the roll winner announcements gained this too), not just the roll-type icon and the text.
+
 ## 4.0.7
 - Fixed: auto-roll (per-item rules and auto-greed) could mask the item without ever actually submitting a roll. The addon was deferring the `RollOnLoot` call by 0.1s through an OnUpdate ticker for no functional reason -- long enough, in some cases, for the roll to get cancelled or resolved server-side before the call ran, silently doing nothing. It's now called immediately and synchronously in the same tick as `START_LOOT_ROLL`, like a real click would.
 

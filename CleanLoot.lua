@@ -33,6 +33,7 @@ local LOCALES = {
         OPT_AUTO_DE      = "Auto-DE greens (else greed)",
         OPT_WINNER_POPUP = "Winner popup (log closed)",
         RULE_CREATED     = "auto-roll rule set: %s on %s",
+        AUTOROLL_LABEL   = "Auto-rolled",
         RULES_TITLE      = "Auto-roll rules",
         RULES_BTN        = "Auto-roll rules",
         RULES_ADD        = "Add",
@@ -104,6 +105,7 @@ local LOCALES = {
         OPT_AUTO_DE      = "DE auto verts (sinon greed)",
         OPT_WINNER_POPUP = "Popup gagnant (journal ferme)",
         RULE_CREATED     = "regle auto-roll definie : %s sur %s",
+        AUTOROLL_LABEL   = "Auto-roll",
         RULES_TITLE      = "Regles auto-roll",
         RULES_BTN        = "Regles auto-roll",
         RULES_ADD        = "Ajouter",
@@ -1740,8 +1742,14 @@ local function StartRollFrame(rollID, rollTime)
         local ok, err = pcall(RollOnLoot, rollID, autoType)
         if not ok then
             PrintError("RollOnLoot (auto)", err)
-        elseif CleanLootDB.debugMode then
-            print(MSG .. ("[debug] RollOnLoot(%s, %s) submitted"):format(tostring(rollID), tostring(autoType)))
+        else
+            if CleanLootDB.debugMode then
+                print(MSG .. ("[debug] RollOnLoot(%s, %s) submitted"):format(tostring(rollID), tostring(autoType)))
+            end
+            if NotifyWinnerPopup then
+                local link = rollItemLinks[rollID] or ("["..(name or "item").."]")
+                NotifyWinnerPopup(link, L.AUTOROLL_LABEL or "Auto-rolled", nil, texture, false, autoType)
+            end
         end
         return
     end
@@ -2229,10 +2237,16 @@ local function CreateWinnerPopup()
 
     f.__lines = {}
     f.__lineIcons = {}
+    f.__itemIcons = {}
     for i = 1, WINNER_POPUP_MAX do
+        local itemIcon = f:CreateTexture(nil, "ARTWORK")
+        itemIcon:SetSize(12, 12)
+        itemIcon:SetPoint("TOPLEFT", f, "TOPLEFT", 6, -5 - (i - 1) * 15)
+        f.__itemIcons[i] = itemIcon
+
         local icon = f:CreateTexture(nil, "ARTWORK")
         icon:SetSize(12, 12)
-        icon:SetPoint("TOPLEFT", f, "TOPLEFT", 6, -5 - (i - 1) * 15)
+        icon:SetPoint("LEFT", itemIcon, "RIGHT", 2, 0)
         f.__lineIcons[i] = icon
 
         local fs = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -2270,14 +2284,17 @@ RefreshWinnerPopup = function()
     for i = 1, WINNER_POPUP_MAX do
         local fs = f.__lines[i]
         local icon = f.__lineIcons[i]
+        local itemIcon = f.__itemIcons[i]
         local entry = winnerLines[i]
         if entry then
             fs:SetText(entry.text)
             fs:Show()
             if entry.icon then icon:SetTexture(entry.icon); icon:Show() else icon:Hide() end
+            if entry.itemIcon then itemIcon:SetTexture(entry.itemIcon); itemIcon:Show() else itemIcon:Hide() end
         else
             fs:Hide()
             icon:Hide()
+            itemIcon:Hide()
         end
     end
     f.__topLink = winnerLines[1] and winnerLines[1].link
@@ -2315,6 +2332,7 @@ NotifyWinnerPopup = function(displayLink, winnerName, winValue, icon, force, win
         text = text,
         link = displayLink and displayLink:match("|H(item:[^|]+)|h") and displayLink or nil,
         icon = winType and ICON_BY_TYPE[winType],
+        itemIcon = icon,
         expires = GetTime() + WINNER_POPUP_DURATION,
     })
     while #winnerLines > WINNER_POPUP_MAX do table.remove(winnerLines) end
@@ -2987,7 +3005,8 @@ local function StartTestMode()
     -- Force the winner popup with a demo line so it can be positioned even
     -- though the log window is open during test mode.
     if NotifyWinnerPopup then
-        NotifyWinnerPopup("["..(L.TEST_ITEM or "Test item").."]", ME_DISPLAY_NAME, 92, nil, true, "Need")
+        NotifyWinnerPopup("["..(L.TEST_ITEM or "Test item").."]", ME_DISPLAY_NAME, 92,
+            "Interface\\Icons\\INV_Misc_QuestionMark", true, "Need")
     end
     print(MSG .. L.MSG_TEST_OPEN)
 end
