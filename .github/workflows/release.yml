@@ -1,6 +1,6 @@
 name: Package and release
 
-# A tag push (v5.0.0-beta1, v5.0.0...) packages the addon with the BigWigs packager
+# A tag push (v1.0.0, v1.0.1-beta1...) packages the addon with the BigWigs packager
 # and uploads it. The CurseForge upload only happens when the .toc has
 # "## X-Curse-Project-ID" and the repository has a CF_API_KEY secret; without them
 # the packager just skips CurseForge and still creates the GitHub release.

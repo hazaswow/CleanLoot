@@ -7,7 +7,6 @@ manual-changelog:
 
 # Development material that must not ship in the addon zip.
 ignore:
-  - legacy
   - tools
   - .github
   - .gitignore

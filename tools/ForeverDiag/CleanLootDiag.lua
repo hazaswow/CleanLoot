@@ -1,5 +1,5 @@
 -- CleanLootDiag
--- Dev tool for porting CleanLoot to WoW Forever (Interface 16001, retail UI
+-- Dev tool for CleanLoot on WoW Forever (Interface 16001, retail UI
 -- architecture). It guesses nothing: it records what the client really exposes
 -- (APIs, events, native roll frame structure, C_LootHistory data) into
 -- CleanLootDiagDB, which WoW writes to disk on /reload or logout.
@@ -92,8 +92,8 @@ end
 -- API availability dump
 -------------------------------------------------
 local GLOBALS = {
-    -- 3.3.5 calls CleanLoot uses today
-    "GetNumPartyMembers", "GetNumRaidMembers", "GetAddOnMetadata", "SetBackdrop_unused",
+    -- old calls (expected MISSING: the modern API replaced them)
+    "GetNumPartyMembers", "GetNumRaidMembers", "GetAddOnMetadata",
     -- modern replacements
     "GetNumGroupMembers", "GetNumSubgroupMembers", "IsInRaid", "IsInGroup",
     -- loot roll

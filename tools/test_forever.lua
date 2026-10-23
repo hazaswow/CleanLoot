@@ -98,7 +98,7 @@ WOW.FireEvent("CANCEL_LOOT_ROLL", 5002)
 check(RF.ActiveCount() == 0, "CANCEL_LOOT_ROLL closes the frame")
 
 -- 8. The mouse-down snapshot: a click that straddles a frame reuse must not
---    vote on the new item (the 4.0.1 bug)
+--    vote on the new item
 WOW.FireEvent("START_LOOT_ROLL", 6001, 20000)
 local fa = RF.GetFrame(6001)
 local btn = fa.buttons[G]
@@ -412,7 +412,7 @@ check(obj.type == "launcher", "it is a launcher data object")
 
 local lines = {}
 obj.OnTooltipShow({ AddLine = function(_, t) lines[#lines + 1] = t end })
-check(lines[1] == "CleanLoot v5.0.0-test", "tooltip shows the addon version (got " .. tostring(lines[1]) .. ")")
+check(lines[1] == "CleanLoot v1.0.0-test", "tooltip shows the addon version (got " .. tostring(lines[1]) .. ")")
 
 WOW.shift = false
 obj.OnClick(nil, "LeftButton")

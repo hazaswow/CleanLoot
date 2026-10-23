@@ -158,7 +158,7 @@ local function CreateRollButton(f, rollType)
     b:RegisterForClicks("LeftButtonUp")
     -- Snapshot the target roll on mouse-DOWN: between down and up the roll can
     -- end by itself and this pooled frame be handed to a new item, which would
-    -- then receive the click (the 4.0.1 bug on Ascension).
+    -- then receive the click: a vote on the wrong item.
     b:SetScript("OnMouseDown", function(self)
         self.clickRollID = f.rollID
     end)

@@ -2,8 +2,6 @@
 
 Clean loot roll frames for **WoW Forever** (the official Blizzard beta client). Lightweight and standalone.
 
-> CleanLoot started on Ascension. That server is closed, and the old 3.3.5 version is kept at tag [`v4.0.8`](https://github.com/hazaswow/CleanLoot/tree/v4.0.8). This is a rewrite for Forever.
-
 ## Features
 
 - **Its own roll frames** in place of Blizzard's: item icon with tooltip (**Ctrl+click** to preview, **Shift+click** to link in chat), name and border coloured by quality, timer bar, and **Need / Greed / Pass** (Forever has no Disenchant or Transmog rolls)

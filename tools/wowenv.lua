@@ -192,7 +192,7 @@ C_Item = {
     RequestLoadItemDataByID = function() end,
     GetItemQualityColor = function(q) local c = ITEM_QUALITY_COLORS[q] return c.r, c.g, c.b, "ffffffff" end,
 }
-C_AddOns = { GetAddOnMetadata = function() return "5.0.0-test" end, LoadAddOn = function() return true end }
+C_AddOns = { GetAddOnMetadata = function() return "1.0.0-test" end, LoadAddOn = function() return true end }
 function InCombatLockdown() return WOW.combat or false end
 
 -- Blizzard's loot history window (load-on-demand in the real client).
