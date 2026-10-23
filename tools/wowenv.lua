@@ -1,240 +1,329 @@
--- Minimal WoW 3.3.5 API stub harness for smoke-loading CleanLoot.lua outside the game client.
--- Not a full API mock: unknown calls fall back to permissive no-op stubs so the addon can
--- execute its top-level/init code without crashing. Real per-feature unit tests belong in
--- their own small standalone Lua scripts (see CLAUDE.md).
+-- Minimal WoW (Forever / retail API) stub harness for running CleanLoot outside
+-- the game client. Loads every .lua file listed in CleanLoot.toc, in order, with
+-- the (addonName, namespace) varargs WoW passes, and exposes controllable time,
+-- timers and events so scenarios can be scripted (see tools/test_forever.lua).
+--
+-- Not a full API mock: unknown globals fall back to permissive stubs so the
+-- addon can run. It checks logic, not looks -- visuals need the real client.
 
--- ---------------------------------------------------------------------
--- Generic auto-vivifying stub object: any method call or field access
--- returns another stub, and plain field assignment works normally.
--- ---------------------------------------------------------------------
+local WOW = { now = 1000, timers = {}, frames = {}, chat = {} }
+
+-------------------------------------------------
+-- Generic stub object (callable + indexable)
+-------------------------------------------------
 local StubMeta = {}
-local function NewStub()
-    return setmetatable({}, StubMeta)
-end
+local function NewStub() return setmetatable({}, StubMeta) end
 StubMeta.__index = function(t, k)
-    local v = function(...) return NewStub() end
+    local v = function() return NewStub() end
     rawset(t, k, v)
     return v
 end
-StubMeta.__call = function(t, ...) return NewStub() end
+StubMeta.__call = function() return NewStub() end
 
--- ---------------------------------------------------------------------
--- Frame stub: supports the handful of methods CleanLoot actually relies
--- on for layout/behavior decisions, backed by real state where it matters.
--- ---------------------------------------------------------------------
+-------------------------------------------------
+-- Frames: real state where the addon depends on it
+-------------------------------------------------
+-- WoW methods are PascalCase and unknown ones should be harmless no-ops, but
+-- plain fields (f.rollID, f.link...) are nil until set -- a frame must never
+-- hand back a truthy function for a field the addon has not assigned.
+local FrameMeta = {}
+FrameMeta.__index = function(t, k)
+    if type(k) == "string" and k:match("^%u") then
+        local v = function() return NewStub() end
+        rawset(t, k, v)
+        return v
+    end
+    return nil
+end
+
 local function NewFrame(frameType, name, parent)
-    local f = NewStub()
-    local points = {}
-    local shown = true
-    local scripts = {}
-    local size = { w = 0, h = 0 }
+    local f = setmetatable({}, FrameMeta)
+    local points, shown, scripts, events = {}, false, {}, {}
+    local enabled, value, scale = true, 0, 1
+    local text = ""
 
-    rawset(f, "SetPoint", function(self, point, relTo, relPoint, x, y)
-        points[#points + 1] = { point, relTo, relPoint, x or 0, y or 0 }
-        return self
-    end)
-    rawset(f, "GetPoint", function(self, i)
-        local p = points[i or #points] or { "CENTER", nil, "CENTER", 0, 0 }
-        return p[1], p[2], p[3], p[4], p[5]
-    end)
-    rawset(f, "ClearAllPoints", function(self) points = {} return self end)
-    rawset(f, "Show", function(self) shown = true return self end)
-    rawset(f, "Hide", function(self) shown = false return self end)
-    rawset(f, "IsShown", function(self) return shown end)
-    rawset(f, "IsVisible", function(self) return shown end)
-    rawset(f, "SetShown", function(self, v) shown = v and true or false return self end)
-    rawset(f, "SetSize", function(self, w, h) size.w, size.h = w, h return self end)
-    rawset(f, "SetWidth", function(self, w) size.w = w return self end)
-    rawset(f, "SetHeight", function(self, h) size.h = h return self end)
-    rawset(f, "GetWidth", function(self) return size.w end)
-    rawset(f, "GetHeight", function(self) return size.h end)
-    rawset(f, "SetScript", function(self, ev, fn) scripts[ev] = fn return self end)
-    rawset(f, "GetScript", function(self, ev) return scripts[ev] end)
-    rawset(f, "HookScript", function(self, ev, fn)
-        local prev = scripts[ev]
-        scripts[ev] = function(...) if prev then prev(...) end return fn(...) end
-        return self
-    end)
-    rawset(f, "RegisterEvent", function(self, ev) return self end)
-    rawset(f, "UnregisterEvent", function(self, ev) return self end)
-    rawset(f, "RegisterForClicks", function(self, ...) return self end)
-    rawset(f, "RegisterForDrag", function(self, ...) return self end)
-    rawset(f, "SetBackdrop", function(self, bd) rawset(self, "_backdrop", bd) return self end)
-    rawset(f, "GetBackdrop", function(self) return rawget(self, "_backdrop") end)
-    rawset(f, "SetFont", function(self, font, size, flags)
-        if font == nil then return false end
-        rawset(self, "_font", { font, size, flags })
-        return true
-    end)
-    rawset(f, "GetFont", function(self)
-        local ft = rawget(self, "_font")
-        if ft then return ft[1], ft[2], ft[3] end
-        return "Fonts\\FRIZQT__.TTF", 10, ""
-    end)
-    rawset(f, "SetText", function(self, t) rawset(self, "_text", t) return self end)
-    rawset(f, "GetText", function(self) return rawget(self, "_text") or "" end)
-    rawset(f, "GetName", function(self) return name end)
-    rawset(f, "GetObjectType", function(self) return frameType or "Frame" end)
-    rawset(f, "GetParent", function(self) return parent end)
-    rawset(f, "IsObjectType", function(self, t) return t == (frameType or "Frame") end)
-    rawset(f, "CreateFontString", function(self, n, layer, template) return NewFrame("FontString", n, self) end)
-    rawset(f, "CreateTexture", function(self, n, layer, template) return NewFrame("Texture", n, self) end)
-    rawset(f, "GetRegions", function(self) return end)
-    rawset(f, "SetScale", function(self, s) rawset(self, "_scale", s) return self end)
-    rawset(f, "GetScale", function(self) return rawget(self, "_scale") or 1 end)
-    rawset(f, "SetAlpha", function(self, a) rawset(self, "_alpha", a) return self end)
-    rawset(f, "GetAlpha", function(self) return rawget(self, "_alpha") or 1 end)
-    rawset(f, "EnableMouse", function(self, v) return self end)
-    rawset(f, "SetMovable", function(self, v) return self end)
-    rawset(f, "SetClampedToScreen", function(self, v) return self end)
-    rawset(f, "StartMoving", function(self) return self end)
-    rawset(f, "StopMovingOrSizing", function(self) return self end)
+    local function set(k, fn) rawset(f, k, fn) end
+    set("SetPoint", function(self, ...) points[#points + 1] = { ... } return self end)
+    set("GetPoint", function(self) local p = points[#points] or { "CENTER", nil, "CENTER", 0, 0 } return p[1], p[2], p[3], p[4], p[5] end)
+    set("ClearAllPoints", function(self) points = {} end)
+    set("Show", function(self) shown = true end)
+    set("Hide", function(self) shown = false end)
+    set("IsShown", function(self) return shown end)
+    set("IsVisible", function(self) return shown end)
+    set("SetScript", function(self, ev, fn) scripts[ev] = fn end)
+    set("GetScript", function(self, ev) return scripts[ev] end)
+    set("HookScript", function(self, ev, fn) local prev = scripts[ev] scripts[ev] = function(...) if prev then prev(...) end return fn(...) end end)
+    set("RegisterEvent", function(self, ev) events[ev] = true end)
+    set("UnregisterEvent", function(self, ev) events[ev] = nil end)
+    set("IsEventRegistered", function(self, ev) return events[ev] == true end)
+    set("Enable", function(self) enabled = true end)
+    set("Disable", function(self) enabled = false end)
+    set("IsEnabled", function(self) return enabled end)
+    set("SetValue", function(self, v) value = v end)
+    set("GetValue", function(self) return value end)
+    set("IsForbidden", function(self) return false end)
+    local checked = false
+    set("SetChecked", function(self, v) checked = v and true or false end)
+    set("GetChecked", function(self) return checked end)
+    rawset(f, "__alpha", 1)
+    rawset(f, "__clickEnabled", true)
+    rawset(f, "__motionEnabled", true)
+    set("SetAlpha", function(self, a) rawset(self, "__alpha", a) end)
+    set("GetAlpha", function(self) return self.__alpha end)
+    set("SetMouseClickEnabled", function(self, v) rawset(self, "__clickEnabled", v) end)
+    set("SetMouseMotionEnabled", function(self, v) rawset(self, "__motionEnabled", v) end)
+    set("SetScale", function(self, s) scale = s end)
+    set("GetScale", function(self) return scale end)
+    set("SetText", function(self, t) text = t end)
+    set("GetText", function(self) return text end)
+    set("GetName", function(self) return name end)
+    set("GetParent", function(self) return parent end)
+    set("GetObjectType", function(self) return frameType or "Frame" end)
+    set("CreateFontString", function(self) return NewFrame("FontString", nil, self) end)
+    set("CreateTexture", function(self) return NewFrame("Texture", nil, self) end)
+    rawset(f, "__children", {})
+    set("GetChildren", function(self) return (table.unpack or unpack)(self.__children) end)
+    set("IsMouseClickEnabled", function(self) return self.__clickEnabled end)
+    set("IsMouseMotionEnabled", function(self) return self.__motionEnabled end)
+    rawset(f, "__events", events)
+    rawset(f, "__scripts", scripts)
 
+    WOW.frames[#WOW.frames + 1] = f
     if name then _G[name] = f end
+    -- children are real: GetChildren() lets the addon walk a frame's tree
+    -- (regions -- textures and font strings -- are not children in WoW's sense)
+    if type(parent) == "table" and rawget(parent, "__children")
+        and frameType ~= "Texture" and frameType ~= "FontString" then
+        local list = rawget(parent, "__children")
+        list[#list + 1] = f
+    end
     return f
 end
 
--- ---------------------------------------------------------------------
--- WoW globals CleanLoot depends on
--- ---------------------------------------------------------------------
-_G = _G or {}
+function CreateFrame(frameType, name, parent) return NewFrame(frameType, name, parent) end
+UIParent = NewFrame("Frame", "UIParent")
+UIParent:Show()
+GameTooltip = NewFrame("GameTooltip", "GameTooltip")
+-- Record what the tooltip would show, so scenarios can check its content.
+GameTooltip.lines = {}
+rawset(GameTooltip, "SetOwner", function(self, owner) self.owner = owner self.lines = {} end)
+rawset(GameTooltip, "IsOwned", function(self, f) return self.owner == f end)
+rawset(GameTooltip, "AddLine", function(self, t) self.lines[#self.lines + 1] = tostring(t) end)
+rawset(GameTooltip, "AddDoubleLine", function(self, l, r) self.lines[#self.lines + 1] = tostring(l) .. " | " .. tostring(r) end)
+rawset(GameTooltip, "SetText", function(self, t) self.lines = { tostring(t) } end)
 
-function CreateFrame(frameType, name, parent, template)
-    return NewFrame(frameType, name, parent)
+-------------------------------------------------
+-- Time, timers, events
+-------------------------------------------------
+function GetTime() return WOW.now end
+C_Timer = {
+    After = function(delay, fn) WOW.timers[#WOW.timers + 1] = { at = WOW.now + delay, fn = fn } end,
+}
+
+-- Advance the clock like the game does: in small steps (the real client calls
+-- OnUpdate every frame), running due timers in order and OnUpdate scripts.
+local STEP = 0.05
+function WOW.Advance(dt)
+    local remaining = dt
+    while remaining > 1e-9 do
+        local step = math.min(STEP, remaining)
+        remaining = remaining - step
+        local target = WOW.now + step
+        while true do
+            local nextIdx, nextAt
+            for i, t in ipairs(WOW.timers) do
+                if t.at <= target and (not nextAt or t.at < nextAt) then nextIdx, nextAt = i, t.at end
+            end
+            if not nextIdx then break end
+            local t = table.remove(WOW.timers, nextIdx)
+            WOW.now = math.max(WOW.now, t.at)
+            t.fn()
+        end
+        WOW.now = target
+        for _, f in ipairs(WOW.frames) do
+            local up = f.__scripts.OnUpdate
+            if up and f:IsShown() then up(f, step) end
+        end
+    end
 end
 
-function GetTime() return os.clock() end
-function GetLocale() return "enUS" end
-function IsShiftKeyDown() return false end
-function IsControlKeyDown() return false end
-function IsAltKeyDown() return false end
-
-function GetNumPartyMembers() return 0 end
-function GetNumRaidMembers() return 0 end
-function UnitName(unit) return "Player" end
-function GetGroupRoster() return end
-
--- Loot roll API
-function GetNumLootRollItems() return 0 end
-function GetLootRollItemInfo(rollID)
-    -- texture, name, count, quality, bindOnPickUp, canNeed, canGreed, canDisenchant, reasonNeed, reasonGreed, reasonDisenchant
-    return "Interface\\Icons\\INV_Misc_QuestionMark", "Test Item", 1, 4, false, 1, 1, 1, nil, nil, nil
-end
-function GetLootRollItemLink(rollID) return "|cffa335ee|Hitem:12345:0:0:0:0:0:0:0|h[Test Item]|h|r" end
-function RollOnLoot(rollID, rollType) end
-function GetLootMethod() return "group" end
-function ConfirmLootSlot(slot) end
-
-function GetItemInfo(item)
-    -- name, link, quality, iLevel, reqLevel, class, subclass, maxStack, equipSlot, texture
-    return "Test Item", "|cffa335ee|Hitem:12345:0:0:0:0:0:0:0|h[Test Item]|h|r", 4, 80, 1,
-        "Miscellaneous", "Junk", 1, "", "Interface\\Icons\\INV_Misc_QuestionMark"
+function WOW.FireEvent(event, ...)
+    for _, f in ipairs(WOW.frames) do
+        local h = f.__scripts.OnEvent
+        if h and f.__events[event] then h(f, event, ...) end
+    end
 end
 
-function GetCVar(name) return "0" end
-function SetCVar(name, val) end
-
-function ChatEdit_InsertLink(link) return false end
-function DressUpItemLink(link) end
-
-FauxScrollFrame_GetOffset = function(f) return 0 end
-FauxScrollFrame_Update = function(f, numItems, numShown, itemHeight) end
-FauxScrollFrame_OnVerticalScroll = function(f, offset, itemHeight, updateFn) end
-
-InterfaceOptions_AddCategory = function(panel) end
-StaticPopupDialogs = setmetatable({}, { __newindex = rawset, __index = function() return nil end })
-StaticPopup_Show = function(name) return NewFrame("Frame") end
-StaticPopup_Hide = function(name) end
+-------------------------------------------------
+-- Globals the addon touches
+-------------------------------------------------
+function print(...)
+    local parts = {}
+    for i = 1, select("#", ...) do parts[i] = tostring((select(i, ...))) end
+    WOW.chat[#WOW.chat + 1] = table.concat(parts, " ")
+end
 
 SlashCmdList = {}
+function date(fmt) return os.date(fmt) end
+function IsControlKeyDown() return WOW.ctrl or false end
+function IsShiftKeyDown() return WOW.shift or false end
+function issecretvalue() return false end
+function UnitName() return "Tester" end
 
--- Loot roll global strings (LOOT_ROLL_* etc.), sourced with an English fallback
--- the addon itself expects — provide the base strings it patterns off of.
-LOOT_ROLL_YOU_WON = "You won %s"
-LOOT_ROLL_WON = "%s won: %s"
-NEED = "Need"
-GREED = "Greed"
-PASS = "Pass"
-DISENCHANT = "Disenchant"
-YES = "Yes"
-NO = "No"
-DELETE_ITEM_CONFIRM_STRING = "Are you sure you want to delete %s?"
-DELETE_GOOD_ITEM_CONFIRM_STRING = "%s is a valuable item. Are you sure you want to delete it?"
+ITEM_QUALITY_COLORS = {
+    [0] = { r = 0.62, g = 0.62, b = 0.62 }, [1] = { r = 1, g = 1, b = 1 },
+    [2] = { r = 0.12, g = 1, b = 0 }, [3] = { r = 0, g = 0.44, b = 0.87 },
+    [4] = { r = 0.64, g = 0.21, b = 0.93 }, [5] = { r = 1, g = 0.5, b = 0 },
+}
 
--- WoW's Lua environment aliases several stdlib functions under short names
--- and adds a few table helpers; the 3.3.5 client and these libs assume them.
-strmatch = string.match
-strfind = string.find
-strsub = string.sub
-strlower = string.lower
-strupper = string.upper
-strrep = string.rep
-strlen = string.len
-strbyte = string.byte
-strchar = string.char
-format = string.format
-gsub = string.gsub
-tinsert = table.insert
-tremove = table.remove
-sort = table.sort
-function strsplit(sep, str)
-    local parts = {}
-    for part in string.gmatch(str, "([^" .. sep .. "]+)") do
-        parts[#parts + 1] = part
-    end
-    return unpack(parts)
+-- Item data: id -> name, quality, icon. Every id the simulator may pick is
+-- "cached" so a scenario runs without async item loading.
+WOW.items = {}
+for i, id in ipairs({ 2589, 4306, 118, 2092, 1204, 1980, 12940, 14551, 16799, 11815, 18803, 19019 }) do
+    WOW.items[id] = { name = "Item" .. id, quality = (i % 5) + 1, icon = 100000 + id }
 end
-function strjoin(sep, ...)
-    return table.concat({ ... }, sep)
+function GetItemInfo(id)
+    local it = WOW.items[id]
+    if not it then return nil end
+    return it.name, ("|cffffffff|Hitem:%d::::::::|h[%s]|h|r"):format(id, it.name), it.quality, 1, 1, "", "", 1, "", it.icon
 end
-function strtrim(s) return s:match("^%s*(.-)%s*$") end
-function wipe(t) for k in pairs(t) do t[k] = nil end return t end
-unpack = unpack or table.unpack
+C_Item = {
+    GetItemInfo = GetItemInfo,
+    RequestLoadItemDataByID = function() end,
+    GetItemQualityColor = function(q) local c = ITEM_QUALITY_COLORS[q] return c.r, c.g, c.b, "ffffffff" end,
+}
+C_AddOns = { GetAddOnMetadata = function() return "5.0.0-test" end, LoadAddOn = function() return true end }
+function InCombatLockdown() return WOW.combat or false end
 
--- ---------------------------------------------------------------------
--- Load the embedded libs for real BEFORE installing the catch-all stub
--- below — LibStub.lua does `local LibStub = LibStub or {...}`, which the
--- catch-all would short-circuit by handing back a stub function instead
--- of the real nil/table it expects on first load.
--- ---------------------------------------------------------------------
-local function loadReal(path)
-    local chunk, err = loadfile(path)
-    if not chunk then
-        print("FAILED TO PARSE " .. path .. ": " .. tostring(err))
-        os.exit(1)
-    end
-    local ok, runErr = pcall(chunk)
-    if not ok then
-        print("FAILED TO RUN " .. path .. ": " .. tostring(runErr))
-        os.exit(1)
+-- Blizzard's loot history window (load-on-demand in the real client).
+GroupLootHistoryFrame = NewFrame("Frame", "GroupLootHistoryFrame")
+function GroupLootHistoryFrame:SetShown(v) if v then self:Show() else self:Hide() end end
+
+-- The client's loot roll chat strings, exactly as the diagnostic captured them.
+LOOT_ROLL_NEED = "|HlootHistory:%d|h[Loot]|h: %s has selected Need for: %s"
+LOOT_ROLL_GREED = "|HlootHistory:%d|h[Loot]|h: %s has selected Greed for: %s"
+LOOT_ROLL_PASSED = "|HlootHistory:%d|h[Loot]|h: %s passed on: %s"
+LOOT_ROLL_NEED_SELF = "|HlootHistory:%d|h[Loot]|h: You have selected Need for: %s"
+LOOT_ROLL_GREED_SELF = "|HlootHistory:%d|h[Loot]|h: You have selected Greed for: %s"
+LOOT_ROLL_PASSED_SELF = "|HlootHistory:%d|h[Loot]|h: You passed on: %s"
+LOOT_ROLL_WON = "|HlootHistory:%d|h[Loot]|h: %s won: %s"
+LOOT_ROLL_YOU_WON = "|HlootHistory:%d|h[Loot]|h: You won: %s"
+LOOT_ROLL_ROLLED_NEED = "|HlootHistory:%d|h[Loot]|h: Need Roll - %d for %s by %s"
+LOOT_ROLL_ROLLED_GREED = "|HlootHistory:%d|h[Loot]|h: Greed Roll - %d for %s by %s"
+WOW.chatFilters = {}
+function ChatFrame_AddMessageEventFilter(event, fn) WOW.chatFilters[event] = fn end
+
+-- Settings API: record what gets registered / opened.
+Settings = {
+    RegisterCanvasLayoutCategory = function(panel, name)
+        local c = { ID = 99, name = name, panel = panel, GetID = function() return 99 end }
+        WOW.category = c
+        return c
+    end,
+    RegisterAddOnCategory = function(c) WOW.registeredCategory = c end,
+    OpenToCategory = function(id) WOW.openedCategory = id end,
+}
+
+-- Fake LibStub + LibDataBroker + LibDBIcon (the real ones are exercised in the
+-- game; here we only check how the addon drives them).
+WOW.libs, WOW.ldbObjects = {}, {}
+WOW.dbicon = { registered = {}, hidden = {} }
+WOW.libs["LibDataBroker-1.1"] = {
+    NewDataObject = function(self, name, obj)
+        if WOW.ldbObjects[name] then return nil end
+        WOW.ldbObjects[name] = obj
+        return obj
+    end,
+    GetDataObjectByName = function(self, name) return WOW.ldbObjects[name] end,
+}
+WOW.libs["LibDBIcon-1.0"] = {
+    Register = function(self, name, obj, db) WOW.dbicon.registered[name] = { obj = obj, db = db } end,
+    IsRegistered = function(self, name) return WOW.dbicon.registered[name] ~= nil end,
+    Hide = function(self, name) WOW.dbicon.hidden[name] = true end,
+    Show = function(self, name) WOW.dbicon.hidden[name] = false end,
+}
+LibStub = { GetLibrary = function(self, name) return WOW.libs[name] end }
+
+Enum = { EncounterLootDropRollState = { NeedMainSpec = 0, NeedOffSpec = 1, Transmog = 2, Greed = 3, NoRoll = 4, Pass = 5 } }
+RAID_CLASS_COLORS = {
+    DRUID = { r = 1, g = 0.49, b = 0.04 }, WARRIOR = { r = 0.78, g = 0.61, b = 0.43 },
+    HUNTER = { r = 0.67, g = 0.83, b = 0.45 },
+}
+
+-- hooksecurefunc: run `fn` after the original global function, like WoW does.
+function hooksecurefunc(name, fn)
+    local orig = _G[name]
+    _G[name] = function(...)
+        local result = orig(...)
+        fn(...)
+        return result
     end
 end
 
-loadReal("Libs/LibStub/LibStub.lua")
-loadReal("Libs/CallbackHandler-1.0/CallbackHandler-1.0.lua")
-loadReal("Libs/LibDataBroker-1.1/LibDataBroker-1.1.lua")
-loadReal("Libs/LibDBIcon-1.0/LibDBIcon-1.0.lua")
+-- Blizzard's native roll frames: a managed container holding named roll frames,
+-- each with an icon button and a container of roll buttons (shape taken from the
+-- real client, see the ForeverDiag capture).
+GroupLootContainer = NewFrame("Frame", "GroupLootContainer")
+GroupLootContainer.maxIndex = 3
+GroupLootContainer.rollFrames = {}
+for i = 1, 4 do
+    local nf = NewFrame("Frame", "GroupLootFrame" .. i, GroupLootContainer)
+    nf.IconFrame = NewFrame("Button", nil, nf)
+    nf.LootButtonContainer = NewFrame("Frame", nil, nf)
+    for _, key in ipairs({ "NeedButton", "GreedButton", "PassButton", "TransmogButton" }) do
+        nf.LootButtonContainer[key] = NewFrame("Button", nil, nf.LootButtonContainer)
+    end
+end
+function GroupLootContainer_AddFrame() end
+function GroupLootContainer_Update() end
 
--- Any other WoW global the addon touches falls back to a permissive stub
--- (function-that-returns-a-stub for calls, chainable for methods).
+-- What the "player" owns, for the simulator's item pool.
+WOW.equipped = {}  -- slot -> itemID
+WOW.bags = {}      -- bag -> { itemID, ... }
+function GetInventoryItemID(unit, slot) return WOW.equipped[slot] end
+C_Container = {
+    GetContainerNumSlots = function(bag) local b = WOW.bags[bag] return b and #b or 0 end,
+    GetContainerItemID = function(bag, slot) local b = WOW.bags[bag] return b and b[slot] end,
+}
+
+-- Anything else: a permissive stub (namespaces become indexable tables).
 setmetatable(_G, {
     __index = function(t, k)
-        local v = function(...) return NewStub() end
+        -- SavedVariables are genuinely nil on a first run
+        if type(k) == "string" and k:match("DB$") then return nil end
+        local v
+        if type(k) == "string" and k:match("^C_") then v = NewStub() else v = function() return NewStub() end end
         rawset(t, k, v)
         return v
     end,
 })
 
-local chunk, err = loadfile("CleanLoot.lua")
-if not chunk then
-    print("PARSE FAILED: " .. tostring(err))
-    os.exit(1)
+-------------------------------------------------
+-- Load the addon exactly as WoW would: files from the .toc, in order
+-------------------------------------------------
+local ADDON = "CleanLoot"
+local CL = {}
+WOW.CL = CL
+
+for line in io.lines("CleanLoot.toc") do
+    local file = line:match("^([^#%s][^%s]*%.lua)%s*$")
+    -- the embedded libraries are replaced by fakes above
+    if file and not file:match("^Libs[\\/]") then
+        local chunk, err = loadfile(file)
+        if not chunk then
+            io.stderr:write("PARSE FAILED " .. file .. ": " .. tostring(err) .. "\n")
+            os.exit(1)
+        end
+        local ok, runErr = pcall(chunk, ADDON, CL)
+        if not ok then
+            io.stderr:write("RUNTIME ERROR in " .. file .. ": " .. tostring(runErr) .. "\n")
+            os.exit(1)
+        end
+    end
 end
 
-local ok, runErr = pcall(chunk)
-if not ok then
-    print("RUNTIME ERROR: " .. tostring(runErr))
-    os.exit(1)
-end
+WOW.FireEvent("ADDON_LOADED", ADDON)
 
-print("LOADED OK")
+WOW.loaded = true
+io.write("LOADED OK\n")
+return WOW

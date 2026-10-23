@@ -1,0 +1,8 @@
+## Interface: 16001
+## Title: CleanLoot Diag
+## Notes: Dev tool for porting CleanLoot to WoW Forever. Records which loot-roll APIs, events and frames the client really exposes, and saves them to SavedVariables.
+## Author: Hazas
+## Version: 0.1
+## SavedVariables: CleanLootDiagDB
+
+CleanLootDiag.lua
