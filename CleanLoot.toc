@@ -1,8 +1,9 @@
 ## Interface: 16001
 ## Title: CleanLoot
-## Notes: Clean loot roll frames for WoW Forever (Need/Greed/Pass), with a built-in drop simulator for testing.
+## Notes: Clean loot roll frames for WoW Forever (Need/Greed/Pass): live vote counters, who has not rolled yet, queued rolls on big drops, and a minimap button. Standalone.
 ## Author: Hazas
-## Version: 5.0.0-dev
+## Version: 5.0.0-beta1
+## X-Website: https://github.com/hazaswow/CleanLoot
 ## SavedVariables: CleanLootDB
 
 Libs\LibStub\LibStub.lua

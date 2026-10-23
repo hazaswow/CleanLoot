@@ -1,0 +1,14 @@
+package-as: CleanLoot
+
+# Release notes on CurseForge / GitHub come from CHANGELOG.md.
+manual-changelog:
+  filename: CHANGELOG.md
+  markup-type: markdown
+
+# Development material that must not ship in the addon zip.
+ignore:
+  - legacy
+  - tools
+  - .github
+  - .gitignore
+  - CLAUDE.md

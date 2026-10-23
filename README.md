@@ -1,57 +1,51 @@
 # CleanLoot
 
-A lightweight, standalone reskin of the group loot roll frames (Need/Greed/Disenchant/Pass) for **WoW 3.3.5**, built and tested on **Ascension (Conquest of Azeroth)**. **No ElvUI required.**
+Clean loot roll frames for **WoW Forever** (the official Blizzard beta client). Lightweight and standalone.
+
+> CleanLoot started on Ascension. That server is closed, and the old 3.3.5 version is kept at tag [`v4.0.8`](https://github.com/hazaswow/CleanLoot/tree/v4.0.8). This is a rewrite for Forever.
 
 ## Features
 
-- Renders its **own** loot roll frames on top of the hidden native ones — no native glitches (gold backdrop, double bars, stuck buttons)
-- Two visual styles: **Improved Classic** (clean dark look) or **ElvUI-inspired compact**
-- **Movable** and **scalable** frames (scale slider in options)
-- Stack direction of your choice (upward or downward); items collapse neatly when a roll resolves
-- Border and item name **colored by item quality**; roll timer fades **yellow → red**
-- **Need/Greed/Disenchant buttons gray out** when unavailable (Disenchant is group-aware), independently of each other
-- **Live vote counters** on each button, with a mouseover tooltip showing who voted — works even while the button is grayed out
-- **Icon interaction**: hover for tooltip, Shift-hover to compare, **Ctrl+left-click** to preview the appearance, **Shift+left-click** to link in chat
-- **Combined roll log** (`/cll history`): one window listing every item, with each group member's vote; unresolved items stay expanded, resolved ones collapse and sort Need > Greed/DE > Pass, then value
-- **Ephemeral winner popup** (12s) when an item resolves and the log window is closed — click it to open the log
-- **Per-item auto-roll rules**: right-click a roll button to always roll that way for that item; manage rules from `/cll arr` (add by name/ID, change type, delete, grouped by type)
-- **Masking**: when an auto-roll rule or auto-greed applies, the roll frame never appears — it rolls silently
-- **Auto-greed / auto-DE** on green (uncommon) items only
-- **Minimap button** (left-click: roll log, right-click: test mode), hideable from the options
-- Optional **confirmation popup skipping** (BoP rolls, BoP loot)
-- Optional **simple Delete confirmation** (Yes/No instead of typing "DELETE")
-- Optional **hide roll messages** from the chat window
-- Automatic **EN/FR localization** based on the client language
+- **Its own roll frames** in place of Blizzard's: item icon with tooltip (**Ctrl+click** to preview, **Shift+click** to link in chat), name and border coloured by quality, timer bar, and **Need / Greed / Pass** (Forever has no Disenchant or Transmog rolls)
+- **Live vote counters**: a number on each button for how many players chose it, and on hover the list of players (class coloured, with the roll once the game reveals it) — also on a greyed-out button, which also tells you why it is unavailable
+- **"Hasn't rolled yet"**: a small clock with the number of players still deciding; hover for who
+- **Big drops**: more rolls than frames? The rest wait in a queue and appear as you answer, with their timers still running. No roll is lost
+- **After a `/reload`**, rolls still running are brought back
+- **Blizzard's own roll frames are hidden** (and stop catching clicks). `/cll native show` brings them back
+- **Less chat spam**: the per-roll lines (who selected what, roll values) are filtered out; **who won what** and your loot stay visible. Blizzard's *Loot Rolls* history window keeps everything
+- **Minimap button**: left-click the loot history, right-click the options
+- Options under *Game Menu → Options → AddOns → CleanLoot*: stacking direction, scale, hide/show Blizzard's frames, chat filter, minimap button
 
 ## Installation
 
-1. Download the latest release zip (or `Code → Download ZIP`).
-2. Extract it into `Interface/AddOns/`.
-3. Make sure the folder is named exactly `CleanLoot` (rename it if it ends with `-main`), and that it contains the `Libs/` subfolder.
-4. Restart the game.
+- **CurseForge / WoW addon manager**: install *CleanLoot* for WoW Forever.
+- **Manual**: download the zip from the [releases](https://github.com/hazaswow/CleanLoot/releases) and extract the `CleanLoot` folder into the `Interface/AddOns` folder of your WoW Forever install (`_classic_beta_` during the beta). The folder must be named exactly `CleanLoot` and contain `Libs/`.
 
 ## Commands
 
 | Command | Effect |
 |---|---|
-| `/cll test` | Show dummy frames to preview the skin and reposition everything (drag with left click) + open options |
-| `/cll stop` | Close test mode and save positions |
-| `/cll options` / `/cll menu` | Open the options panel only |
-| `/cll history` | Open the combined roll log window |
-| `/cll arr` / `/cll rules` | Open the auto-roll rules window |
-| `/cll reset` | Reset positions to default |
-| `/cll debugmode` | Toggle diagnostic messages (turn on before reporting a bug, then share a chat screenshot) |
-| `/cll debug` | Diagnose the loot frames on this client |
-| `/cll scan` | List all regions of GroupLootFrame1 (advanced debugging) |
+| `/cll options` | Open the options panel |
+| `/cll grow up\|down` | Stacking direction |
+| `/cll scale <0.8-1.5>` | Frame scale |
+| `/cll native show\|hide` | Blizzard's own roll frames |
+| `/cll restore` | Bring back rolls still running (automatic at login and `/reload`) |
+| `/cll sim [n]` | Simulate *n* loot rolls (1-8) with a simulated group, to try the frames without a real drop |
+| `/cll sim colors` | One simulated drop of every item colour |
+| `/cll sim group <n>` | Size of the simulated group (1-39 other players) |
+| `/cll sim chat` | Toggle the simulator's chat lines |
+| `/cll sim clear` | Remove the simulated rolls |
+| `/cll debug [on\|off]` | Trace every roll in chat (why one did or did not show) |
 
 ## Notes
 
-- Diagnostic output is always in English regardless of the client language, so bug reports stay readable.
-- The `Libs/` folder (LibStub, CallbackHandler-1.0, LibDataBroker-1.1, LibDBIcon-1.0) is required for the minimap button and must be kept alongside `CleanLoot.lua`.
+- Forever is still in beta and its API changes: if something breaks after a client update, please report it with the build number.
+- Frames are drag-to-move (left click and drag any roll frame); *Reset position* is in the options.
+- Blizzard's roll frames are only ever hidden by alpha and mouse state: their managed container is never moved or resized, so nothing is tainted.
 
 ## Reporting bugs
 
-Run `/cll debugmode`, reproduce the issue, and share a screenshot of your chat along with your client language and the skin you use.
+Run `/cll debug on`, reproduce the issue, and share the chat lines with your client build.
 
 ## Author
 
