@@ -8,6 +8,7 @@ manual-changelog:
 # Development material that must not ship in the addon zip.
 ignore:
   - tools
+  - assets
   - .github
   - .gitignore
   - CLAUDE.md

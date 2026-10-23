@@ -4,6 +4,7 @@
 ## Author: Hazas
 ## Version: 1.0.0
 ## X-Website: https://github.com/hazaswow/CleanLoot
+## X-Curse-Project-ID: 1760635
 ## SavedVariables: CleanLootDB
 
 Libs\LibStub\LibStub.lua
