@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.1
+- The roll frames are now **locked** by default, so a real roll never moves by accident. Unlock them with the new option, or `/cll unlock` (`/cll lock` to lock again); they are always movable while `/cll sim` rolls are on screen.
+- New two-frame icon, used in the addon list and on the minimap button.
+- Internal cleanup.
+
 ## 1.0.0
 First release, for **WoW Forever**.
 
