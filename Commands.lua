@@ -1,4 +1,4 @@
-local ADDON_NAME, CL = ...
+local _, CL = ...
 
 local HELP = {
     "/cll sim [n]       simulate n loot rolls (1-8) from a loot table, fake group",
@@ -7,6 +7,7 @@ local HELP = {
     "/cll sim chat      toggle the simulator's chat lines (off: the game prints its own)",
     "/cll sim clear     remove all simulated rolls",
     "/cll options       open the options panel",
+    "/cll lock | unlock  lock or unlock the frames' position (always movable during /cll sim)",
     "/cll restore       bring back rolls still running (done automatically at login/reload)",
     "/cll debug [on|off]  trace every roll in chat (why one did or did not show)",
     "/cll native show|hide  Blizzard's own roll frames (hidden by default)",
@@ -41,6 +42,10 @@ SlashCmdList["CLEANLOOT"] = function(msg)
         elseif rest == "off" then CL.db.debug = false
         else CL.db.debug = not CL.db.debug end
         CL.Print("debug " .. (CL.db.debug and "on: every roll is traced in chat (and kept in the saved variables)." or "off."))
+    elseif cmd == "lock" or cmd == "unlock" then
+        CL.db.locked = (cmd == "lock")
+        CL.Options.Refresh()
+        CL.Print(CL.db.locked and "frames locked." or "frames unlocked: drag a roll frame to move the stack, /cll lock when done.")
     elseif cmd == "restore" then
         local n = CL.RestoreRolls()
         CL.Print(n > 0 and ("%d running roll(s) brought back."):format(n) or "no running roll to bring back.")

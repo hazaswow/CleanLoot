@@ -13,7 +13,7 @@
 -- /cll native show. Re-applied after Blizzard's own updates, on the next frame
 -- and never from inside them.
 
-local ADDON_NAME, CL = ...
+local _, CL = ...
 
 local Native = {}
 CL.Native = Native

@@ -26,6 +26,7 @@ Clean loot roll frames for **WoW Forever** (the official Blizzard beta client). 
 | `/cll options` | Open the options panel |
 | `/cll grow up\|down` | Stacking direction |
 | `/cll scale <0.8-1.5>` | Frame scale |
+| `/cll lock` / `/cll unlock` | Lock or unlock the frames' position (always movable during `/cll sim`) |
 | `/cll native show\|hide` | Blizzard's own roll frames |
 | `/cll restore` | Bring back rolls still running (automatic at login and `/reload`) |
 | `/cll sim [n]` | Simulate *n* loot rolls (1-8) with a simulated group, to try the frames without a real drop |
@@ -38,7 +39,7 @@ Clean loot roll frames for **WoW Forever** (the official Blizzard beta client). 
 ## Notes
 
 - Forever is still in beta and its API changes: if something breaks after a client update, please report it with the build number.
-- Frames are drag-to-move (left click and drag any roll frame); *Reset position* is in the options.
+- The roll frames are **locked** by default, so a real roll never moves by accident. To place them: run `/cll sim` (they are always movable while simulating), then left-click and drag any frame. Or untick *Lock the frames' position* in the options, or use `/cll unlock`. *Reset position* is in the options.
 - Blizzard's roll frames are only ever hidden by alpha and mouse state: their managed container is never moved or resized, so nothing is tainted.
 
 ## Reporting bugs

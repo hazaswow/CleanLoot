@@ -4,7 +4,7 @@
 --   Right-click  options
 --   Shift-click  simulate a few drops
 
-local ADDON_NAME, CL = ...
+local _, CL = ...
 
 -- (not called Minimap: that is Blizzard's minimap frame)
 local Button = {}
@@ -37,7 +37,7 @@ function Button.Setup()
 
     local object = ldb:NewDataObject(BUTTON_NAME, {
         type = "launcher",
-        icon = "Interface\\Icons\\INV_Misc_Coin_01",
+        icon = "Interface\\AddOns\\CleanLoot\\Media\\Logo",
         OnClick = function(_, button)
             if button == "RightButton" then
                 CL.Options.Open()

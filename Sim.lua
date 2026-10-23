@@ -10,7 +10,7 @@
 -- quality -- a real one when the client can describe one (owned or cached), else
 -- a synthetic one, so every colour can always be tested.
 
-local ADDON_NAME, CL = ...
+local _, CL = ...
 
 local Sim = {}
 CL.Sim = Sim
@@ -89,7 +89,7 @@ local function RealItemsByQuality()
         if seen[id] then return true end
         seen[id] = true
         local name, _, quality = ItemInfo(id)
-        if not name then return false end
+        if not name or type(quality) ~= "number" then return false end  -- not fully loaded yet
         byQuality[quality] = byQuality[quality] or {}
         local list = byQuality[quality]
         list[#list + 1] = id

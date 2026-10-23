@@ -10,19 +10,19 @@
 
 local ADDON_NAME, CL = ...
 
-CL.name = ADDON_NAME
 CL.MSG = "|cff33ff99CleanLoot|r: "
 
 CL.ROLL = { PASS = 0, NEED = 1, GREED = 2 }
 CL.ROLL_NAME = { [0] = "Pass", [1] = "Need", [2] = "Greed" }
 CL.ROLL_ORDER = { 1, 2, 0 }  -- button order on a roll frame
 
--- The look that felt right on Forever is what used to be set by hand to 1.10.
+-- Default frame scale, picked by eye on the real client.
 CL.DEFAULT_SCALE = 1.10
 
 local DEFAULTS = {
     growDirection = "DOWN",
     frameScale = CL.DEFAULT_SCALE,
+    locked = true,  -- the stack cannot be dragged by accident (always movable during /cll sim)
     hideNative = true,  -- hide Blizzard's own roll frames, ours replace them
     hideRollSpam = true,  -- keep the per-roll lines out of the chat
 }
@@ -199,15 +199,16 @@ function API.GetVotes(rollID)
     local votes = { [CL.ROLL.NEED] = {}, [CL.ROLL.GREED] = {}, [CL.ROLL.PASS] = {}, pending = {} }
     for _, info in ipairs(drop.rollInfos) do
         local state = Plain(info.state)
+        local isSelf = Plain(info.isSelf)
         local rollType = STATE_TO_TYPE[state]
         if rollType then
             local list = votes[rollType]
             list[#list + 1] = {
-                name = info.isSelf and "You" or Plain(info.playerName) or "?",
+                name = isSelf and "You" or Plain(info.playerName) or "?",
                 class = Plain(info.playerClass),
                 value = Plain(info.roll),
             }
-        elseif state == NO_ROLL and not Plain(info.isSelf) then
+        elseif state == NO_ROLL and not isSelf then
             -- has not chosen yet (you are not listed: you are the one deciding)
             votes.pending[#votes.pending + 1] = {
                 name = Plain(info.playerName) or "?",

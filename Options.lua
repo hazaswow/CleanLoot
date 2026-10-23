@@ -3,7 +3,7 @@
 -- plain widgets of our own: no dependency on Blizzard's option templates beyond
 -- the check button and the button.
 
-local ADDON_NAME, CL = ...
+local _, CL = ...
 
 local Options = {}
 CL.Options = Options
@@ -125,21 +125,24 @@ local function Build()
     widgets.chat = Checkbox(panel, "Hide roll messages from the chat (winners stay)", 16, -242,
         function() return CL.db.hideRollSpam end,
         function(v) CL.db.hideRollSpam = v end)
-    widgets.reset = PushButton(panel, "Reset position", 20, -278, 140, function()
+    widgets.lock = Checkbox(panel, "Lock the frames' position (always movable while simulating)", 16, -268,
+        function() return CL.db.locked end,
+        function(v) CL.db.locked = v end)
+    widgets.reset = PushButton(panel, "Reset position", 20, -304, 140, function()
         CL.RollFrames.ResetPosition()
     end)
 
-    Text(panel, "Minimap", 16, -328, "GameFontNormalLarge")
-    widgets.minimap = Checkbox(panel, "Hide the minimap button", 16, -352,
+    Text(panel, "Minimap", 16, -354, "GameFontNormalLarge")
+    widgets.minimap = Checkbox(panel, "Hide the minimap button", 16, -378,
         function() return CL.db.minimap and CL.db.minimap.hide end,
         function(v) CL.MinimapButton.SetHidden(v) end)
 
-    Text(panel, "Testing", 16, -402, "GameFontNormalLarge")
-    Text(panel, "Fake loot rolls with a simulated group, to try the frames without a real drop.", 16, -428,
+    Text(panel, "Testing", 16, -428, "GameFontNormalLarge")
+    Text(panel, "Fake loot rolls with a simulated group, to try the frames without a real drop.", 16, -454,
         "GameFontDisableSmall")
-    widgets.sim = PushButton(panel, "Simulate 3 drops", 20, -450, 150, function() CL.Sim.Start(3) end)
-    widgets.simColors = PushButton(panel, "One of each colour", 180, -450, 150, function() CL.Sim.Colors() end)
-    widgets.simClear = PushButton(panel, "Clear", 340, -450, 80, function() CL.Sim.Clear() end)
+    widgets.sim = PushButton(panel, "Simulate 3 drops", 20, -476, 150, function() CL.Sim.Start(3) end)
+    widgets.simColors = PushButton(panel, "One of each colour", 180, -476, 150, function() CL.Sim.Colors() end)
+    widgets.simClear = PushButton(panel, "Clear", 340, -476, 80, function() CL.Sim.Clear() end)
 
     -- values may have changed through a slash command since the panel was built
     panel:SetScript("OnShow", Options.Refresh)

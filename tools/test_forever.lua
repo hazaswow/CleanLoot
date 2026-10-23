@@ -688,5 +688,52 @@ CL.OnRollGone(7605)
 GroupLootFrame3.rollID = nil
 GroupLootFrame3:Hide()
 
+-- 26. The real /cll sim command shows the "hasn't rolled yet" clock on every frame
+--     (through the slash handler, the way a player types it, not the internal API)
+CL.Sim.SetGroupSize(4)
+SlashCmdList["CLEANLOOT"]("sim 3")
+check(RF.ActiveCount() == 3, "/cll sim 3 opens three frames")
+for i = 1, 3 do
+    local fr = _G["CleanLootRollFrame" .. i]
+    check(fr and fr:IsShown(), "sim frame " .. i .. " is shown")
+    check(fr.pendingFrame:IsShown() and tostring(fr.pendingCount:GetText()) == "4",
+        "/cll sim: frame " .. i .. " shows the clock with the 4 players still deciding")
+    check((fr.pendingFrame:GetPoint()) == "TOPRIGHT", "...in the top-right corner")
+end
+SlashCmdList["CLEANLOOT"]("sim clear")
+check(RF.ActiveCount() == 0, "/cll sim clear removes them")
+
+SlashCmdList["CLEANLOOT"]("sim group 10")
+SlashCmdList["CLEANLOOT"]("sim colors")
+check(RF.ActiveCount() == 5, "/cll sim colors opens five frames")
+for i = 1, 5 do
+    local fr = _G["CleanLootRollFrame" .. i]
+    check(fr.pendingFrame:IsShown() and tostring(fr.pendingCount:GetText()) == "10",
+        "/cll sim colors: frame " .. i .. " shows the clock with 10 players deciding")
+end
+SlashCmdList["CLEANLOOT"]("sim clear")
+CL.Sim.SetGroupSize(4)
+
+-- 27. Position lock: locked by default, movable only when unlocked or while simulating
+CL.Sim.Clear()
+CL.Sim.Start(1)
+check(CL.db.locked == true, "frames are locked by default")
+check(RF.CanMove() == true, "...but movable while simulated rolls are on screen")
+CL.Sim.Clear()
+check(RF.CanMove() == false, "locked, no simulation: not movable")
+local f1 = CleanLootRollFrame1
+f1:GetScript("OnDragStart")(f1)
+check(not f1.dragging, "a drag does nothing while locked")
+f1:GetScript("OnDragStop")(f1)
+SlashCmdList["CLEANLOOT"]("unlock")
+check(CL.db.locked == false and RF.CanMove() == true, "/cll unlock allows moving")
+f1:GetScript("OnDragStart")(f1)
+check(f1.dragging == true, "a drag starts once unlocked")
+f1:GetScript("OnDragStop")(f1)
+check(not f1.dragging and CL.db.point ~= nil, "...and the position is saved on drop")
+SlashCmdList["CLEANLOOT"]("lock")
+check(CL.db.locked == true and RF.CanMove() == false, "/cll lock locks again")
+check(CL.Options.widgets.lock ~= nil, "the options panel has the lock checkbox")
+
 io.write(("%d checks, %d failed\n"):format(checks, failures))
 os.exit(failures == 0 and 0 or 1)

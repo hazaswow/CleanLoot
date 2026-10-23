@@ -1,8 +1,8 @@
 -- Our own loot roll frames. They are independent of Blizzard's GroupLootFrameN
--- (which stay untouched for now: the managed GroupLootContainer must not be
--- tainted), fed through CL.API so they work for real and simulated rolls alike.
+-- (hidden separately by Native.lua), fed through CL.API so they work for real and
+-- simulated rolls alike.
 
-local ADDON_NAME, CL = ...
+local _, CL = ...
 
 local RF = {}
 CL.RollFrames = RF
@@ -189,8 +189,14 @@ local function CreateRollFrame(index)
     f:SetBackdropBorderColor(0, 0, 0, 1)
     f:EnableMouse(true)
     f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function() GetAnchor():StartMoving() end)
-    f:SetScript("OnDragStop", function()
+    f:SetScript("OnDragStart", function(self)
+        if not RF.CanMove() then return end
+        self.dragging = true
+        GetAnchor():StartMoving()
+    end)
+    f:SetScript("OnDragStop", function(self)
+        if not self.dragging then return end
+        self.dragging = nil
         GetAnchor():StopMovingOrSizing()
         SavePosition()
     end)
@@ -475,6 +481,14 @@ end
 
 function RF.QueuedCount()
     return #queue
+end
+
+-- The stack only moves when it is unlocked (options, /cll unlock), or while
+-- simulated rolls are on screen -- the natural moment to place it. A real roll
+-- frame never moves by accident.
+function RF.CanMove()
+    if CL.db and not CL.db.locked then return true end
+    return (CL.Sim and CL.Sim.ActiveCount() > 0) or false
 end
 
 -- Back to the default spot (also forgets the saved one).

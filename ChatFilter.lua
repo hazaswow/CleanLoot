@@ -10,7 +10,7 @@
 -- The patterns are built from the client's own global strings, so they are right
 -- in any language. Each starts with a clickable |HlootHistory:N|h[Loot]|h prefix.
 
-local ADDON_NAME, CL = ...
+local _, CL = ...
 
 local Filter = {}
 CL.ChatFilter = Filter
