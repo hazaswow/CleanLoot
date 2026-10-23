@@ -2,7 +2,7 @@ name: Package and release
 
 # A tag push (v1.0.0, v1.0.1-beta1...) packages the addon with the BigWigs packager
 # and uploads it. The CurseForge upload only happens when the .toc has
-# "## X-Curse-Project-ID" and the repository has a CF_API_KEY secret; without them
+# "## X-Curse-Project-ID" and the repository has a CF_API_TOKEN secret; without them
 # the packager just skips CurseForge and still creates the GitHub release.
 on:
   push:
@@ -16,7 +16,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     env:
-      CF_API_KEY: ${{ secrets.CF_API_KEY }}
+      CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
       GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
