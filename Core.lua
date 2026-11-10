@@ -394,6 +394,8 @@ function CL.OnRollGone(rollID)
     waitingForItem[rollID] = nil
     CL.RollFrames.Stop(rollID)
     API.ForgetRoll(rollID)
+    -- a roll you already answered has no frame left, so Stop does not refresh anything
+    if CL.Results then CL.Results.RefreshWaiting() end
 end
 
 -- After a login or /reload the client does not send START_LOOT_ROLL again for rolls

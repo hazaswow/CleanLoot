@@ -550,5 +550,18 @@ check(not R.WaitingShown(), "once everyone has rolled the card goes")
 CL.Sim.Clear()
 R.Clear()
 
+-- rolls answered with a click have no frame left when they end: the card must still go
+CL.Sim.Start(3)
+WOW.Advance(0.2)
+local answered = {}
+for id = 900001, 901000 do if RF.GetFrame(id) then answered[#answered + 1] = id end end
+check(#answered == 3 and R.WaitingShown(), "three simulated drops: the card is up")
+for _, id in ipairs(answered) do clickButton(RF.GetFrame(id), CL.ROLL.NEED) end
+WOW.Advance(0.2)
+check(RF.ActiveCount() == 0 and R.WaitingShown(), "answered by a click: no frame is left but the others are still waited for")
+WOW.Advance(4)
+check(CL.Sim.ActiveCount() == 0 and not R.WaitingShown(), "...and the card goes when those rolls end")
+R.Clear()
+
 io.write(("%d checks, %d failed\n"):format(checks, failures))
 os.exit(failures == 0 and 0 or 1)
