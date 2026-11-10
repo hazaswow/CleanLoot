@@ -199,6 +199,18 @@ local function Build()
         CL.Results.ResetPosition()
     end)
 
+    Text(panel, "Minimap", 16, -368, "GameFontNormalLarge")
+    widgets.minimap = Checkbox(panel, "Hide the minimap button", 16, -392,
+        function() return CL.db.minimap and CL.db.minimap.hide end,
+        function(v) CL.MinimapButton.SetHidden(v) end)
+
+    -- everything about controller mode is on its own page, under this one
+    Text(panel, "Controller mode", 16, -430, "GameFontNormalLarge")
+    Text(panel, "Play the rolls with a gamepad or the keyboard.", 16, -456, "GameFontDisableSmall")
+    widgets.controllerOpen = PushButton(panel, "Controller mode options", 20, -478, 190, function()
+        Options.OpenController()
+    end)
+
     -- second column, beside the short rows of the first
     Text(panel, "Loot toasts", 330, -56, "GameFontNormalLarge")
     Text(panel, "The \"You won\" banner Blizzard shows.", 330, -84, "GameFontDisableSmall")
@@ -237,37 +249,38 @@ local function Build()
     widgets.resultsMove = PushButton(panel, "Move", 334, -388, 80, function() CL.Results.ToggleSample() end)
     widgets.resultsReset = PushButton(panel, "Reset", 420, -388, 80, function() CL.Results.ResetPosition() end)
 
-    -- the keys of controller mode, set here instead of hunting for them in Key Bindings
-    Text(panel, "Key bindings", 330, -424, "GameFontNormalLarge")
-    Text(panel, "keys and gamepad buttons", 478, -429, "GameFontDisableSmall")
-    for i, entry in ipairs(CL.Keyboard.ACTIONS) do
-        local col, row = (i - 1) % 2, math.floor((i - 1) / 2)
-        local x, y = 330 + col * 150, -450 - row * 26
-        Text(panel, entry.label, x, y - 5, "GameFontNormalSmall")
-        widgets["key" .. i] = KeyField(panel, entry.action, x + 56, y, 90)
-    end
+    Text(panel, "Testing", 330, -430, "GameFontNormalLarge")
+    Text(panel, "Fake loot rolls with a simulated group.", 330, -456, "GameFontDisableSmall")
+    widgets.sim = PushButton(panel, "Simulate 3 drops", 334, -478, 120, function() CL.Sim.Start(3) end)
+    widgets.simColors = PushButton(panel, "Each colour", 458, -478, 100, function() CL.Sim.Colors() end)
+    widgets.simClear = PushButton(panel, "Clear", 562, -478, 64, function() CL.Sim.Clear() end)
 
-    Text(panel, "Testing", 330, -540, "GameFontNormalLarge")
-    widgets.sim = PushButton(panel, "Simulate 3 drops", 334, -564, 120, function() CL.Sim.Start(3) end)
-    widgets.simColors = PushButton(panel, "Each colour", 458, -564, 100, function() CL.Sim.Colors() end)
-    widgets.simClear = PushButton(panel, "Clear", 562, -564, 64, function() CL.Sim.Clear() end)
+    -- values may have changed through a slash command since the panel was built
+    panel:SetScript("OnShow", Options.Refresh)
+    return panel
+end
 
-    Text(panel, "Minimap", 16, -368, "GameFontNormalLarge")
-    widgets.minimap = Checkbox(panel, "Hide the minimap button", 16, -392,
-        function() return CL.db.minimap and CL.db.minimap.hide end,
-        function(v) CL.MinimapButton.SetHidden(v) end)
+-- The page of controller mode: the switch, the inspection tooltip and the keys.
+local function BuildController()
+    local panel = CreateFrame("Frame")
+    panel.name = "Controller mode"
+    Options.controllerPanel = panel
 
-    Text(panel, "Controller mode", 16, -430, "GameFontNormalLarge")
-    widgets.keyboard = Checkbox(panel, "Enable controller mode", 16, -456,
+    Text(panel, "Controller mode", 16, -16, "GameFontNormalLarge")
+    Text(panel, "Play the loot rolls with a gamepad or the keyboard: select a roll, then answer Need, Greed or Pass.",
+        16, -44, "GameFontDisableSmall")
+    widgets.keyboard = Checkbox(panel, "Enable controller mode", 16, -72,
         function() return CL.db.keyboardEnabled end,
         function(v) CL.Keyboard.SetEnabled(v) end)
-    widgets.inspect = DependsOnKeyboard(Checkbox(panel, "Show an item inspection tooltip", 16, -480,
+
+    Text(panel, "Inspection", 16, -116, "GameFontNormalLarge")
+    widgets.inspect = DependsOnKeyboard(Checkbox(panel, "Show an item inspection tooltip", 16, -142,
         function() return CL.db.keyboardInspect end,
         function(v) CL.Keyboard.SetInspect(v) end))
-    widgets.inspectSticky = DependsOnKeyboard(Checkbox(panel, "Keep it on the selected roll (no mouse)", 16, -504,
+    widgets.inspectSticky = DependsOnKeyboard(Checkbox(panel, "Keep it on the selected roll (no mouse)", 16, -166,
         function() return CL.db.keyboardInspectSticky end,
         function(v) CL.Keyboard.SetInspectSticky(v) end))
-    widgets.pawn = DependsOnKeyboard(Checkbox(panel, "Include Pawn upgrade info", 16, -528,
+    widgets.pawn = DependsOnKeyboard(Checkbox(panel, "Include Pawn upgrade info", 16, -190,
         function() return CL.db.keyboardPawn end,
         function(v) CL.Keyboard.SetPawn(v) end))
     local pawnSync = widgets.pawn.Sync
@@ -275,13 +288,25 @@ local function Build()
         pawnSync()
         if not rawget(_G, "PawnUpdateTooltip") then widgets.pawn:Disable() end  -- nothing to include without Pawn
     end
-    widgets.inspectLeft = DependsOnKeyboard(Checkbox(panel, "Show it on the left side", 16, -552,
+    widgets.inspectLeft = DependsOnKeyboard(Checkbox(panel, "Show it on the left side", 16, -214,
         function() return CL.db.keyboardInspectSide == "LEFT" end,
         function(v) CL.Keyboard.SetSide(v and "LEFT" or "RIGHT") end))
 
-    -- values may have changed through a slash command since the panel was built
+    -- the keys of controller mode, set here instead of hunting for them in Key Bindings
+    Text(panel, "Key bindings", 16, -262, "GameFontNormalLarge")
+    Text(panel, "Click a field, then press a key or a controller button. Right-click clears it.",
+        16, -290, "GameFontDisableSmall")
+    for i, entry in ipairs(CL.Keyboard.ACTIONS) do
+        local col, row = (i - 1) % 2, math.floor((i - 1) / 2)
+        local x, y = 16 + col * 290, -316 - row * 32
+        Text(panel, entry.label, x, y - 5, "GameFontNormalSmall")
+        widgets["key" .. i] = KeyField(panel, entry.action, x + 62, y, 150)
+    end
+    Text(panel, "The same actions are in the game's Key Bindings page, under CleanLoot, and work as commands:",
+        16, -420, "GameFontDisableSmall")
+    Text(panel, "/cll next, /cll previous, /cll inspect, /cll need, /cll greed, /cll pass", 16, -438, "GameFontDisableSmall")
+
     panel:SetScript("OnShow", Options.Refresh)
-    Options.Refresh()
     return panel
 end
 
@@ -291,17 +316,34 @@ function Options.Setup()
     local category = Settings.RegisterCanvasLayoutCategory(panel, panel.name)
     Settings.RegisterAddOnCategory(category)
     Options.category = category
+
+    -- controller mode gets a page of its own, listed under CleanLoot
+    local controller = BuildController()
+    if Settings.RegisterCanvasLayoutSubcategory then
+        Options.controllerCategory = Settings.RegisterCanvasLayoutSubcategory(category, controller, controller.name)
+    else
+        Options.controllerCategory = Settings.RegisterCanvasLayoutCategory(controller, "CleanLoot: " .. controller.name)
+        Settings.RegisterAddOnCategory(Options.controllerCategory)
+    end
+    Options.Refresh()
 end
 
-function Options.Open()
+local function OpenCategory(category)
     if InCombatLockdown and InCombatLockdown() then
         CL.Print("the options cannot be opened during combat.")
         return
     end
-    local category = Options.category
     if not (category and Settings and Settings.OpenToCategory) then
         CL.Print("the options panel is not available.")
         return
     end
     Settings.OpenToCategory(category.GetID and category:GetID() or category.ID)
+end
+
+function Options.Open()
+    OpenCategory(Options.category)
+end
+
+function Options.OpenController()
+    OpenCategory(Options.controllerCategory)
 end

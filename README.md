@@ -31,7 +31,8 @@ Clean loot roll frames for **WoW Forever** (the official Blizzard beta client). 
 
 | Command | Effect |
 |---|---|
-| `/cll` | Open the options panel (every setting is there) |
+| `/cll` | Open the options panel |
+| `/cll controller` | Open the controller mode page of the options |
 | `/cll restore` | Bring back rolls still running (automatic at login and `/reload`) |
 | `/cll next` / `/cll previous` | Select the next or previous visible roll |
 | `/cll inspect` | Toggle the separate inspection tooltip |
@@ -44,7 +45,7 @@ Clean loot roll frames for **WoW Forever** (the official Blizzard beta client). 
 
 ## Notes
 
-- To use controller mode, enable **Controller mode** in the CleanLoot options, then set the keys right there (*Key bindings*: click a field, press a key or a controller button, right-click clears), or in the game's Key Bindings page under *CleanLoot*, or put the `/cll` commands in macros or OPie slices. No keys are assigned automatically. The inspection tooltip is an option too (*Show an item inspection tooltip*, off by default), with its side (*Show it on the left side*). It shows only while the mouse is over a roll; tick *Keep it on the selected roll (no mouse)* to keep it up on the selected roll instead, for a gamepad. The Inspect key toggles the same option. Every controller-mode option is off by default.
+- To use controller mode, enable **Controller mode** on its own page of the options (*CleanLoot → Controller mode*, or `/cll controller`), then set the keys right there (*Key bindings*: click a field, press a key or a controller button, right-click clears), or in the game's Key Bindings page under *CleanLoot*, or put the `/cll` commands in macros or OPie slices. No keys are assigned automatically. The inspection tooltip is an option too (*Show an item inspection tooltip*, off by default), with its side (*Show it on the left side*). It shows only while the mouse is over a roll; tick *Keep it on the selected roll (no mouse)* to keep it up on the selected roll instead, for a gamepad. The Inspect key toggles the same option. Every controller-mode option is off by default.
 - Selection cycles through visible rolls in arrival order, not the waiting queue. A roll command with no selection selects the oldest visible item without rolling; press a roll command again to choose. If the inspection is kept on the selected roll, new rolls are selected automatically. Once an item is selected, a roll command acts immediately; the selection moves on when the roll closes.
 - Available roll buttons on the selected item show their first assigned CleanLoot key binding. Keys assigned only to a macro or OPie ring are not shown.
 - The inspection tooltip remains enabled across reloads and reappears when rolls arrive. It does not replace normal mouseover tooltips. If Pawn is installed, its item upgrade information is included (*Include Pawn upgrade info*, off by default); a separate equipped-item comparison is not shown. Bind-on-pickup rolls: the game asks you to confirm (Need or Greed). By default the prompt is yours: the roll frame stays until the game closes the roll, so refusing the prompt leaves the buttons there. Tick *Auto-accept bind-on-pickup prompts* to have CleanLoot accept it for you (the frame then closes at once). This is the same for a click and for a key, and roll keys wait while a prompt is open.

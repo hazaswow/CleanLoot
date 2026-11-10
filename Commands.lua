@@ -2,6 +2,7 @@ local _, CL = ...
 
 local HELP = {
     "/cll               open the options panel",
+    "/cll controller    open the controller mode page of the options",
     "/cll sim [n]       simulate n loot rolls (1-8) with a fake group",
     "/cll sim colors    one simulated drop of every colour",
     "/cll sim group <n> other players in the simulated group (1-39, default 4)",
@@ -21,6 +22,8 @@ SlashCmdList["CLEANLOOT"] = function(msg)
 
     if cmd == "" or cmd == "options" or cmd == "config" then
         CL.Options.Open()
+    elseif cmd == "controller" then
+        CL.Options.OpenController()
     elseif cmd == "sim" then
         local sub, arg = rest:match("^(%S*)%s*(.-)$")
         if sub == "clear" then

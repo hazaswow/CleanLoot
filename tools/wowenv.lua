@@ -258,6 +258,11 @@ Settings = {
     end,
     RegisterAddOnCategory = function(c) WOW.registeredCategory = c end,
     OpenToCategory = function(id) WOW.openedCategory = id end,
+    RegisterCanvasLayoutSubcategory = function(parent, panel, name)
+        local c = { ID = 100, name = name, panel = panel, parent = parent, GetID = function() return 100 end }
+        WOW.subcategory = c
+        return c
+    end,
 }
 
 -- Fake LibStub + LibDataBroker + LibDBIcon (the real ones are exercised in the
