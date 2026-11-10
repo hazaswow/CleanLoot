@@ -23,9 +23,11 @@ local BACKDROP = {
 }
 local GOLD = "|cffffd100"
 
+local WAIT_H = 38    -- the "waiting on rolls" card
 local free = {}      -- cards not in use
 local active = {}    -- cards on screen, oldest first
 local anchor
+local waitCard       -- "waiting on rolls": first in the stack, only while somebody has not rolled
 
 -------------------------------------------------
 -- Position: its own anchor, same lock rule as the roll frames
@@ -219,6 +221,121 @@ local function CreateCard()
     return f
 end
 
+-------------------------------------------------
+-- "Waiting on rolls": who has not answered yet, across the rolls on screen
+-------------------------------------------------
+-- { { name, class, count }, ... }, most rolls missing first, and how many rolls are on screen.
+local function PendingPlayers()
+    local byName, list, total = {}, {}, 0
+    for _, f in ipairs(CL.RollFrames.VisibleFrames()) do
+        total = total + 1
+        local pending = f.votes and f.votes.pending
+        if pending then
+            for _, p in ipairs(pending) do
+                local rec = byName[p.name]
+                if not rec then
+                    rec = { name = p.name, class = p.class, count = 0 }
+                    byName[p.name] = rec
+                    list[#list + 1] = rec
+                end
+                rec.count = rec.count + 1
+            end
+        end
+    end
+    table.sort(list, function(a, b)
+        if a.count ~= b.count then return a.count > b.count end
+        return tostring(a.name) < tostring(b.name)
+    end)
+    return list, total
+end
+
+local function ShowWaitingTooltip(card)
+    local players, total = PendingPlayers()
+    if #players == 0 then return end
+    GameTooltip:SetOwner(card, "ANCHOR_RIGHT")
+    GameTooltip:AddLine(("Hasn't rolled yet (%d)"):format(#players), 1, 1, 1)
+    for _, p in ipairs(players) do
+        local r, g, b = ClassColor(p.class)
+        if total > 1 then
+            -- on how many of the rolls on screen this player is still undecided
+            GameTooltip:AddDoubleLine(ShortName(p.name), ("%d/%d"):format(p.count, total), r, g, b, 0.7, 0.7, 0.7)
+        else
+            GameTooltip:AddLine(ShortName(p.name), r, g, b)
+        end
+    end
+    GameTooltip:Show()
+end
+
+local function CreateWaitCard()
+    local f = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
+    f:SetSize(CARD_W, WAIT_H)
+    f:SetFrameStrata("DIALOG")
+    f:SetBackdrop(BACKDROP)
+    f:SetBackdropColor(0.04, 0.04, 0.04, 0.9)
+    f:SetBackdropBorderColor(0.35, 0.35, 0.35, 1)
+    f:EnableMouse(true)
+    f:RegisterForDrag("LeftButton")
+    f:Hide()
+
+    f.icon = f:CreateTexture(nil, "ARTWORK")
+    f.icon:SetSize(24, 24)
+    f.icon:SetPoint("LEFT", f, "LEFT", 8, 0)
+    f.icon:SetTexture("Interface\\ICONS\\INV_Misc_PocketWatch_02")  -- the clock of the roll frames
+    f.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+
+    f.title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    f.title:SetPoint("TOPLEFT", f.icon, "TOPRIGHT", 6, 2)
+    f.title:SetJustifyH("LEFT")
+    f.title:SetText("Waiting on rolls")
+    f.line = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    f.line:SetPoint("TOPLEFT", f.title, "BOTTOMLEFT", 0, -2)
+    f.line:SetJustifyH("LEFT")
+
+    f:SetScript("OnEnter", function(self) ShowWaitingTooltip(self) end)
+    f:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    f:SetScript("OnDragStart", function(self)
+        if not Results.CanMove() then return end
+        self.dragging = true
+        GetAnchor():StartMoving()
+    end)
+    f:SetScript("OnDragStop", function(self)
+        if not self.dragging then return end
+        self.dragging = nil
+        GetAnchor():StopMovingOrSizing()
+        SavePosition()
+    end)
+    return f
+end
+
+-- Show the card while some roll on screen still has players who have not answered,
+-- hide it otherwise (or when the option is off).
+function Results.RefreshWaiting()
+    local players = {}
+    if CL.db and CL.db.showWaiting then players = PendingPlayers() end
+    if #players == 0 then
+        if waitCard and waitCard:IsShown() then
+            if GameTooltip:IsShown() and GameTooltip:IsOwned(waitCard) then GameTooltip:Hide() end
+            waitCard:Hide()
+            Results.Layout()
+        end
+        return
+    end
+    waitCard = waitCard or CreateWaitCard()
+    waitCard.line:SetText(#players == 1 and "1 player hasn't rolled" or ("%d players haven't rolled"):format(#players))
+    local wasShown = waitCard:IsShown()
+    waitCard:Show()
+    if not wasShown then Results.Layout() end
+    if GameTooltip:IsShown() and GameTooltip:IsOwned(waitCard) then ShowWaitingTooltip(waitCard) end
+end
+
+function Results.WaitingShown()
+    return waitCard ~= nil and waitCard:IsShown()
+end
+
+function Results.WaitCard()
+    return waitCard
+end
+
 -- The popup stacks its own way: its own setting, else the roll frames' direction.
 function Results.Direction()
     local db = CL.db
@@ -235,6 +352,14 @@ function Results.Layout()
     local scale = (CL.db and CL.db.frameScale) or CL.DEFAULT_SCALE
     local base = GetAnchor()
     local prev
+    -- the "waiting on rolls" card opens the stack
+    if waitCard and waitCard:IsShown() then
+        local corner = grow == "UP" and "BOTTOMLEFT" or "TOPLEFT"
+        waitCard:SetScale(scale)
+        waitCard:ClearAllPoints()
+        waitCard:SetPoint(corner, base, corner, 0, 0)
+        prev = waitCard
+    end
     for _, f in ipairs(active) do
         f:SetScale(scale)
         f:ClearAllPoints()

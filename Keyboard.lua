@@ -1,10 +1,24 @@
+-- Keyboard rolls (opt-in): select a visible roll, inspect it, answer Need / Greed / Pass
+-- with key bindings or /cll commands. Nothing here runs unless "Enable keyboard rolls"
+-- is ticked in the options.
+
 local _, CL = ...
 
 local K = {}
 CL.Keyboard = K
 
 local selectedID, selectedFrame
-local inspection, inspectionAnchor, inspectionToggle
+local inspection, inspectionAnchor
+
+-- The actions that can carry a key, in the order the options panel lists them.
+K.ACTIONS = {
+    { action = "CLEANLOOT_NEED", label = "Need" },
+    { action = "CLEANLOOT_NEXT", label = "Next" },
+    { action = "CLEANLOOT_GREED", label = "Greed" },
+    { action = "CLEANLOOT_PREVIOUS", label = "Previous" },
+    { action = "CLEANLOOT_PASS", label = "Pass" },
+    { action = "CLEANLOOT_INSPECT", label = "Inspect" },
+}
 
 local function Eligible(f)
     if not f or not f.rollID then return false end
@@ -21,6 +35,9 @@ local function Reason(f, rollType)
         or ("You can't roll %s on this item."):format(CL.ROLL_NAME[rollType])
 end
 
+-------------------------------------------------
+-- Inspection tooltip (its own tooltip, beside the stack)
+-------------------------------------------------
 local function EnsureInspectionAnchor()
     if not inspectionAnchor then
         inspectionAnchor = CreateFrame("Frame", nil, UIParent)
@@ -37,54 +54,14 @@ local function EnsureInspection()
     inspection:EnableMouse(false)
 end
 
-local function LayoutToggle()
-    local frames = CL.RollFrames.VisibleFrames()
-    if not CL.db.keyboardEnabled or not frames[1] then
-        if inspectionToggle then inspectionToggle:Hide() end
-        return
-    end
-    if not inspectionToggle then
-        local flat = "Interface\\Buttons\\WHITE8X8"
-        inspectionToggle = CreateFrame("Button", "CleanLootInspectionToggle", UIParent, "BackdropTemplate")
-        inspectionToggle:SetSize(92, 20)
-        inspectionToggle:SetBackdrop({ bgFile = flat, edgeFile = flat, edgeSize = 1,
-            insets = { left = 1, right = 1, top = 1, bottom = 1 } })
-        inspectionToggle:SetBackdropColor(0.08, 0.08, 0.08, 0.9)
-        inspectionToggle:SetBackdropBorderColor(0.25, 0.25, 0.25, 1)
-        inspectionToggle.label = inspectionToggle:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        inspectionToggle.label:SetPoint("CENTER")
-        inspectionToggle:SetFrameStrata("DIALOG")
-        inspectionToggle:SetClampedToScreen(true)
-        inspectionToggle:RegisterForClicks("LeftButtonUp")
-        inspectionToggle:SetScript("OnClick", function() K.Action("inspect") end)
-        inspectionToggle:SetScript("OnEnter", function(self) self:SetBackdropBorderColor(0.6, 0.6, 0.6, 1) end)
-        inspectionToggle:SetScript("OnLeave", function(self) self:SetBackdropBorderColor(0.25, 0.25, 0.25, 1) end)
-    end
-    local up = CL.db.growDirection == "UP"
-    local left = CL.db.keyboardInspectSide == "LEFT"
-    inspectionToggle:ClearAllPoints()
-    inspectionToggle:SetScale(CL.db.frameScale or CL.DEFAULT_SCALE)
-    inspectionToggle:SetPoint(up and (left and "TOPRIGHT" or "TOPLEFT") or (left and "BOTTOMRIGHT" or "BOTTOMLEFT"),
-        inspectionAnchor, up and (left and "BOTTOMLEFT" or "BOTTOMRIGHT") or (left and "TOPLEFT" or "TOPRIGHT"),
-        left and -12 or 12, up and -5 or 5)
-    inspectionToggle.label:SetText(CL.db.keyboardInspect and "Inspect: On" or "Inspect: Off")
-    if CL.db.keyboardInspect then
-        inspectionToggle.label:SetTextColor(1, 0.82, 0)
-    else
-        inspectionToggle.label:SetTextColor(0.7, 0.7, 0.7)
-    end
-    inspectionToggle:Show()
-end
-
 function K.Layout()
     if CL.db.keyboardEnabled and #CL.RollFrames.VisibleFrames() > 0 then EnsureInspectionAnchor() end
-    if not inspectionAnchor then LayoutToggle() return end
+    if not inspectionAnchor then return end
     local up = CL.db.growDirection == "UP"
     inspectionAnchor:ClearAllPoints()
     inspectionAnchor:SetScale(CL.db.frameScale or CL.DEFAULT_SCALE)
     inspectionAnchor:SetPoint(up and "BOTTOMLEFT" or "TOPLEFT", CL.RollFrames.Anchor(),
         up and "BOTTOMLEFT" or "TOPLEFT")
-    LayoutToggle()
     if not inspection then return end
     inspection:ClearAllPoints()
     if CL.db.keyboardInspectSide == "LEFT" then
@@ -122,16 +99,20 @@ local function ShowInspection()
     inspection:Show()
 end
 
-local bindingNames = {
+-------------------------------------------------
+-- Key hints on the selected roll's buttons
+-------------------------------------------------
+local bindingActions = {
     [CL.ROLL.NEED] = "CLEANLOOT_NEED",
     [CL.ROLL.GREED] = "CLEANLOOT_GREED",
     [CL.ROLL.PASS] = "CLEANLOOT_PASS",
 }
 
-local function BindingText(rollType)
+-- The first key bound to an action, as text ("Shift-2"), or nil when unbound.
+function K.KeyText(action)
     local getKey = rawget(_G, "GetBindingKey")
     if type(getKey) ~= "function" then return nil end
-    local ok, key = pcall(getKey, bindingNames[rollType])
+    local ok, key = pcall(getKey, action)
     key = ok and CL.Plain(key) or nil
     if type(key) ~= "string" or key == "" then return nil end
     local getText = rawget(_G, "GetBindingText")
@@ -164,7 +145,8 @@ function K.RefreshBindings()
     for _, f in ipairs(CL.RollFrames.VisibleFrames()) do
         for _, rollType in ipairs(CL.ROLL_ORDER) do
             local b = f.buttons[rollType]
-            local text = CL.db.keyboardEnabled and f == selectedFrame and not b.unavailable and BindingText(rollType)
+            local text = CL.db.keyboardEnabled and f == selectedFrame and not b.unavailable
+                and K.KeyText(bindingActions[rollType])
             b.label:ClearAllPoints()
             if text then
                 b.label:SetPoint("TOP", b, "TOP", -6, -1)
@@ -177,6 +159,64 @@ function K.RefreshBindings()
     end
 end
 
+-------------------------------------------------
+-- Setting a key from CleanLoot's own options (the game's Key Bindings page lists
+-- the same actions under "CleanLoot")
+-------------------------------------------------
+local MODIFIER_KEYS = { LSHIFT = true, RSHIFT = true, LCTRL = true, RCTRL = true, LALT = true, RALT = true }
+
+function K.IsModifier(key)
+    return MODIFIER_KEYS[key] == true
+end
+
+-- "SHIFT-2" for the key just pressed, with the modifiers held, in the order the game expects.
+function K.Combo(key)
+    return (IsAltKeyDown() and "ALT-" or "") .. (IsControlKeyDown() and "CTRL-" or "")
+        .. (IsShiftKeyDown() and "SHIFT-" or "") .. key
+end
+
+local function SaveBindingSet()
+    if SaveBindings and GetCurrentBindingSet then SaveBindings(GetCurrentBindingSet()) end
+end
+
+local function InCombat()
+    return InCombatLockdown and InCombatLockdown() or false
+end
+
+function K.Unbind(action)
+    if InCombat() then
+        CL.Print("key bindings cannot be changed during combat.")
+        return false
+    end
+    for _, key in ipairs({ GetBindingKey(action) }) do SetBinding(key) end
+    SaveBindingSet()
+    K.RefreshBindings()
+    return true
+end
+
+-- One key per action: the previous key of the action goes, and a key another action
+-- had is taken over (and said so).
+function K.Bind(key, action)
+    if InCombat() then
+        CL.Print("key bindings cannot be changed during combat.")
+        return false
+    end
+    local previous = GetBindingAction and GetBindingAction(key) or ""
+    for _, old in ipairs({ GetBindingKey(action) }) do SetBinding(old) end
+    SetBinding(key, action)
+    SaveBindingSet()
+    if type(previous) == "string" and previous ~= "" and previous ~= action then
+        local name = GetBindingName and GetBindingName(previous) or previous
+        CL.Print(("%s was bound to %s: it is now yours."):format(GetBindingText and GetBindingText(key) or key,
+            tostring(name)))
+    end
+    K.RefreshBindings()
+    return true
+end
+
+-------------------------------------------------
+-- Selection
+-------------------------------------------------
 local function Select(f)
     if selectedFrame then selectedFrame.selection:Hide() end
     selectedFrame = Eligible(f) and f or nil
@@ -225,6 +265,18 @@ function K.SetEnabled(enabled)
     CL.db.keyboardEnabled = enabled and true or false
     if CL.db.keyboardEnabled then K.OnChanged() else Select(nil) end
     K.Layout()
+    if CL.Options and CL.Options.Refresh then CL.Options.Refresh() end  -- the options that depend on it
+end
+
+-- The inspection tooltip on or off (an option; also the Inspect binding).
+function K.SetInspect(enabled)
+    CL.db.keyboardInspect = enabled and true or false
+    if CL.db.keyboardInspect and CL.db.keyboardEnabled and not selectedID then
+        Select(First())
+    else
+        ShowInspection()
+    end
+    K.Layout()
 end
 
 function K.SetSide(side)
@@ -236,6 +288,9 @@ function K.SelectedID()
     return selectedID
 end
 
+-------------------------------------------------
+-- Actions
+-------------------------------------------------
 local function LootConfirmationOpen()
     local findPopup = rawget(_G, "StaticPopup_FindVisible")
     if type(findPopup) == "function" then
@@ -255,9 +310,8 @@ function K.Action(action)
         return
     end
     if action == "inspect" then
-        CL.db.keyboardInspect = not CL.db.keyboardInspect
-        if CL.db.keyboardInspect and not selectedID then Select(First()) else ShowInspection() end
-        K.Layout()
+        K.SetInspect(not CL.db.keyboardInspect)
+        if CL.Options and CL.Options.Refresh then CL.Options.Refresh() end
         return
     end
     local frames = CL.RollFrames.VisibleFrames()
@@ -289,25 +343,23 @@ function K.Action(action)
         CL.Print(Reason(selectedFrame, rollType))
         return
     end
-    local id = selectedID
-    local simulated = CL.Sim and CL.Sim.GetRoll(id)
-    local waitsForConfirmation = not simulated and selectedFrame.bop and rollType ~= CL.ROLL.PASS
-    if CL.API.Roll(id, rollType) then
-        if not waitsForConfirmation then CL.RollFrames.Stop(id) end
-    else
+    -- the same answer as a click: a bind-on-pickup roll waits for the game's confirmation
+    if not CL.RollFrames.Answer(selectedID, rollType, selectedFrame.bop) then
         CL.Print("Roll not submitted; the item remains selected.")
     end
 end
 
-BINDING_HEADER_CLEANLOOT = "CleanLoot"
-BINDING_NAME_CLEANLOOT_NEXT = "Select next loot roll"
-BINDING_NAME_CLEANLOOT_PREVIOUS = "Select previous loot roll"
-BINDING_NAME_CLEANLOOT_INSPECT = "Toggle loot inspection"
-BINDING_NAME_CLEANLOOT_NEED = "Roll Need"
-BINDING_NAME_CLEANLOOT_GREED = "Roll Greed"
-BINDING_NAME_CLEANLOOT_PASS = "Pass on loot"
+BINDING_NAME_CLEANLOOT_NEXT = "CleanLoot: select next loot roll"
+BINDING_NAME_CLEANLOOT_PREVIOUS = "CleanLoot: select previous loot roll"
+BINDING_NAME_CLEANLOOT_INSPECT = "CleanLoot: toggle loot inspection"
+BINDING_NAME_CLEANLOOT_NEED = "CleanLoot: roll Need"
+BINDING_NAME_CLEANLOOT_GREED = "CleanLoot: roll Greed"
+BINDING_NAME_CLEANLOOT_PASS = "CleanLoot: pass on loot"
 function CleanLootKeyboardAction(action) K.Action(action) end
 
 local bindingWatcher = CreateFrame("Frame")
 bindingWatcher:RegisterEvent("UPDATE_BINDINGS")
-bindingWatcher:SetScript("OnEvent", function() K.RefreshBindings() end)
+bindingWatcher:SetScript("OnEvent", function()
+    K.RefreshBindings()
+    if CL.Options and CL.Options.Refresh then CL.Options.Refresh() end
+end)

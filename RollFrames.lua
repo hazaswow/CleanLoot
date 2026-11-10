@@ -167,14 +167,13 @@ local function CreateRollButton(f, rollType)
     -- end by itself and this pooled frame be handed to a new item, which would
     -- then receive the click: a vote on the wrong item.
     b:SetScript("OnMouseDown", function(self)
-        self.clickRollID = f.rollID
+        self.clickRollID, self.clickBop = f.rollID, f.bop
     end)
     b:SetScript("OnClick", function(self)
-        local id = self.clickRollID
+        local id, bop = self.clickRollID, self.clickBop
         if not id or self.unavailable then return end
-        self.clickRollID = nil
-        CL.API.Roll(id, self.rollType)
-        RF.Stop(id)  -- like the native frame, a rolled-on item is done
+        self.clickRollID, self.clickBop = nil, nil
+        RF.Answer(id, self.rollType, bop)
     end)
     b:SetScript("OnEnter", function(self)
         if not self.unavailable then self:SetBackdropBorderColor(0.6, 0.6, 0.6, 1) end
@@ -462,6 +461,7 @@ function RF.Start(rollID, info, link, rollTime)
     CL.Debug("roll %s shown: %s", tostring(rollID), tostring(info.name))
     RF.Layout()
     if CL.Keyboard then CL.Keyboard.OnChanged() end
+    if CL.Results then CL.Results.RefreshWaiting() end
     return f
 end
 
@@ -488,6 +488,27 @@ function RF.Stop(rollID)
     FillFromQueue()
     RF.Layout()
     if CL.Keyboard then CL.Keyboard.OnRemoved(rollID, removedIndex, f) end
+    if CL.Results then CL.Results.RefreshWaiting() end
+end
+
+-- Answers a roll (a click or a key). Most answers close the frame at once, like the
+-- native one. A bind-on-pickup roll the game wants confirmed (Need or Greed) keeps
+-- its frame: the roll is still open until the game takes the answer, so refusing the
+-- confirmation leaves the buttons there to answer again, and accepting it makes the
+-- game close the roll (CANCEL_LOOT_ROLL). With "accept bind-on-pickup prompts" on
+-- there is nothing to refuse, so the frame closes at once. Returns false when the
+-- answer was not sent.
+function RF.Answer(rollID, rollType, bop)
+    if not rollID then return false end
+    local simulated = CL.Sim and CL.Sim.GetRoll(rollID)
+    local waits = bop and not simulated and rollType ~= CL.ROLL.PASS and not (CL.db and CL.db.autoConfirm)
+    if not CL.API.Roll(rollID, rollType) then return false end
+    if waits then
+        CL.Debug("roll %s: answered, the frame stays until the game closes the roll (bind-on-pickup)", tostring(rollID))
+    else
+        RF.Stop(rollID)
+    end
+    return true
 end
 
 function RF.IsQueued(rollID)

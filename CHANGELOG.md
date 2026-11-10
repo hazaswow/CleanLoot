@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.3.0
+- **Keyboard rolls** (off by default, contributed by chuwix): select a visible roll, answer Need / Greed / Pass with key bindings or `/cll` commands, and optionally show the selected item in a separate inspection tooltip (with Pawn upgrade info when Pawn is installed). The keys are set from CleanLoot's options, or in Key Bindings under *CleanLoot*. Inspection is a checkbox in the options.
+- **Bind-on-pickup rolls**: the roll frame now stays until the game closes the roll, so refusing the game's confirmation prompt no longer loses the buttons (mouse and keys alike). New option *Auto-accept bind-on-pickup prompts* (off by default) accepts the prompt for you.
+- **Waiting on rolls**: a card at the start of the winner popup shows how many players have not rolled yet; hover for who. An option turns it off.
+
 ## 1.2.1
 - The winner popup has its own stacking direction (downwards or upwards) in the options, independent of the roll frames. Until you pick one it follows the roll frames, as before.
 

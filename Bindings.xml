@@ -1,8 +1,12 @@
+<!-- Key bindings: Game Menu > Options > Key Bindings > CleanLoot (the `category` attribute is
+     what this client groups addon bindings by). The names are set in Keyboard.lua; each starts
+     with "CleanLoot:" so a search for the addon finds them. They can also be set from CleanLoot's
+     own options panel. -->
 <Bindings>
-    <Binding name="CLEANLOOT_NEXT" header="CLEANLOOT">CleanLootKeyboardAction("next")</Binding>
-    <Binding name="CLEANLOOT_PREVIOUS">CleanLootKeyboardAction("previous")</Binding>
-    <Binding name="CLEANLOOT_INSPECT">CleanLootKeyboardAction("inspect")</Binding>
-    <Binding name="CLEANLOOT_NEED">CleanLootKeyboardAction("need")</Binding>
-    <Binding name="CLEANLOOT_GREED">CleanLootKeyboardAction("greed")</Binding>
-    <Binding name="CLEANLOOT_PASS">CleanLootKeyboardAction("pass")</Binding>
+    <Binding name="CLEANLOOT_NEXT" category="CleanLoot">CleanLootKeyboardAction("next")</Binding>
+    <Binding name="CLEANLOOT_PREVIOUS" category="CleanLoot">CleanLootKeyboardAction("previous")</Binding>
+    <Binding name="CLEANLOOT_INSPECT" category="CleanLoot">CleanLootKeyboardAction("inspect")</Binding>
+    <Binding name="CLEANLOOT_NEED" category="CleanLoot">CleanLootKeyboardAction("need")</Binding>
+    <Binding name="CLEANLOOT_GREED" category="CleanLoot">CleanLootKeyboardAction("greed")</Binding>
+    <Binding name="CLEANLOOT_PASS" category="CleanLoot">CleanLootKeyboardAction("pass")</Binding>
 </Bindings>

@@ -86,6 +86,64 @@ local function PushButton(parent, label, x, y, width, onClick)
     return b
 end
 
+-- A key field for a binding: click, press a key (modifiers count), Esc cancels,
+-- right-click clears. The same binding as the one in the game's Key Bindings page.
+local function KeyField(parent, action, x, y, width)
+    local K = CL.Keyboard
+    local btn = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
+    btn:SetSize(width, 24)
+    btn:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
+    btn:RegisterForClicks("AnyUp")
+    local capturing
+
+    local function Show()
+        btn:SetText(capturing and "Press a key..." or K.KeyText(action) or "Not bound")
+    end
+    local function Stop()
+        capturing = false
+        btn:EnableKeyboard(false)
+        Show()
+    end
+
+    btn:SetScript("OnClick", function(_, button)
+        if button == "RightButton" then
+            K.Unbind(action)
+            Stop()
+            return
+        end
+        capturing = true
+        btn:EnableKeyboard(true)
+        if btn.SetPropagateKeyboardInput then btn:SetPropagateKeyboardInput(false) end
+        Show()
+    end)
+    btn:SetScript("OnKeyDown", function(_, key)
+        if K.IsModifier(key) then return end
+        if key ~= "ESCAPE" then K.Bind(K.Combo(key), action) end
+        Stop()
+    end)
+    btn:SetScript("OnHide", function() if capturing then Stop() end end)
+    btn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:AddLine("Click, then press a key", 1, 1, 1)
+        GameTooltip:AddLine("Right-click clears it.", 0.7, 0.7, 0.7)
+        GameTooltip:Show()
+    end)
+    btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    btn:EnableKeyboard(false)
+    btn.Sync = function() if capturing then Stop() else Show() end end
+    return btn
+end
+
+-- A checkbox that only means something while keyboard rolls are on: greyed out otherwise.
+local function DependsOnKeyboard(cb)
+    local sync = cb.Sync
+    cb.Sync = function()
+        sync()
+        if CL.db.keyboardEnabled then cb:Enable() else cb:Disable() end
+    end
+    return cb
+end
+
 -------------------------------------------------
 -- Panel
 -------------------------------------------------
@@ -128,7 +186,10 @@ local function Build()
     widgets.lock = Checkbox(panel, "Lock the frames' and popup's position", 16, -268,
         function() return CL.db.locked end,
         function(v) CL.db.locked = v end)
-    widgets.reset = PushButton(panel, "Reset position", 20, -304, 140, function()
+    widgets.autoConfirm = Checkbox(panel, "Auto-accept bind-on-pickup prompts", 16, -294,
+        function() return CL.db.autoConfirm end,
+        function(v) CL.db.autoConfirm = v end)
+    widgets.reset = PushButton(panel, "Reset position", 20, -326, 140, function()
         CL.RollFrames.ResetPosition()
         CL.Results.ResetPosition()
     end)
@@ -162,32 +223,49 @@ local function Build()
     widgets.resultsUp = Checkbox(panel, "Stack upwards", 470, -330,
         function() return CL.Results.Direction() == "UP" end,
         function() CL.Results.SetDirection("UP") end)
-    widgets.resultsMove = PushButton(panel, "Move", 334, -366, 80, function() CL.Results.ToggleSample() end)
-    widgets.resultsReset = PushButton(panel, "Reset", 420, -366, 80, function() CL.Results.ResetPosition() end)
+    widgets.waiting = Checkbox(panel, "Show who hasn't rolled yet", 330, -354,
+        function() return CL.db.showWaiting end,
+        function(v)
+            CL.db.showWaiting = v
+            CL.Results.RefreshWaiting()
+        end)
+    widgets.resultsMove = PushButton(panel, "Move", 334, -388, 80, function() CL.Results.ToggleSample() end)
+    widgets.resultsReset = PushButton(panel, "Reset", 420, -388, 80, function() CL.Results.ResetPosition() end)
 
-    Text(panel, "Minimap", 16, -354, "GameFontNormalLarge")
-    widgets.minimap = Checkbox(panel, "Hide the minimap button", 16, -378,
+    -- the keys of the keyboard rolls, set here instead of hunting for them in Key Bindings
+    Text(panel, "Key bindings", 330, -428, "GameFontNormalLarge")
+    for i, entry in ipairs(CL.Keyboard.ACTIONS) do
+        local col, row = (i - 1) % 2, math.floor((i - 1) / 2)
+        local x, y = 330 + col * 150, -456 - row * 28
+        Text(panel, entry.label, x, y - 5, "GameFontNormalSmall")
+        widgets["key" .. i] = KeyField(panel, entry.action, x + 56, y, 90)
+    end
+
+    Text(panel, "Minimap", 16, -368, "GameFontNormalLarge")
+    widgets.minimap = Checkbox(panel, "Hide the minimap button", 16, -392,
         function() return CL.db.minimap and CL.db.minimap.hide end,
         function(v) CL.MinimapButton.SetHidden(v) end)
 
-    Text(panel, "Keyboard rolls", 16, -414, "GameFontNormalLarge")
-    widgets.keyboard = Checkbox(panel, "Enable keyboard rolls", 16, -440,
+    Text(panel, "Keyboard rolls", 16, -430, "GameFontNormalLarge")
+    widgets.keyboard = Checkbox(panel, "Enable keyboard rolls", 16, -456,
         function() return CL.db.keyboardEnabled end,
         function(v) CL.Keyboard.SetEnabled(v) end)
-    Text(panel, "Inspection side", 16, -468)
-    widgets.inspectRight = Checkbox(panel, "Right", 128, -464,
+    widgets.inspect = DependsOnKeyboard(Checkbox(panel, "Show the selected item's inspection", 16, -480,
+        function() return CL.db.keyboardInspect end,
+        function(v) CL.Keyboard.SetInspect(v) end))
+    Text(panel, "Inspection side", 16, -512)
+    widgets.inspectRight = DependsOnKeyboard(Checkbox(panel, "Right", 128, -508,
         function() return CL.db.keyboardInspectSide ~= "LEFT" end,
-        function() CL.Keyboard.SetSide("RIGHT") end)
-    widgets.inspectLeft = Checkbox(panel, "Left", 230, -464,
+        function() CL.Keyboard.SetSide("RIGHT") end))
+    widgets.inspectLeft = DependsOnKeyboard(Checkbox(panel, "Left", 230, -508,
         function() return CL.db.keyboardInspectSide == "LEFT" end,
-        function() CL.Keyboard.SetSide("LEFT") end)
+        function() CL.Keyboard.SetSide("LEFT") end))
 
-    Text(panel, "Testing", 16, -512, "GameFontNormalLarge")
-    Text(panel, "Fake loot rolls with a simulated group, to try the frames without a real drop.", 16, -538,
-        "GameFontDisableSmall")
-    widgets.sim = PushButton(panel, "Simulate 3 drops", 20, -560, 150, function() CL.Sim.Start(3) end)
-    widgets.simColors = PushButton(panel, "One of each colour", 180, -560, 150, function() CL.Sim.Colors() end)
-    widgets.simClear = PushButton(panel, "Clear", 340, -560, 80, function() CL.Sim.Clear() end)
+    Text(panel, "Testing", 16, -544, "GameFontNormalLarge")
+    Text(panel, "Fake rolls with a simulated group.", 100, -549, "GameFontDisableSmall")
+    widgets.sim = PushButton(panel, "Simulate 3 drops", 20, -570, 150, function() CL.Sim.Start(3) end)
+    widgets.simColors = PushButton(panel, "One of each colour", 180, -570, 150, function() CL.Sim.Colors() end)
+    widgets.simClear = PushButton(panel, "Clear", 340, -570, 80, function() CL.Sim.Clear() end)
 
     -- values may have changed through a slash command since the panel was built
     panel:SetScript("OnShow", Options.Refresh)

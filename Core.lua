@@ -26,6 +26,8 @@ local DEFAULTS = {
     hideNative = true,  -- hide Blizzard's own roll frames, ours replace them
     hideRollSpam = true,  -- keep the per-roll lines out of the chat
     showResults = true,  -- a small popup with who won each roll, and with what
+    autoConfirm = false,  -- accept the game's bind-on-pickup prompt for you (off: the prompt is yours to answer)
+    showWaiting = true,  -- the "waiting on rolls" card at the start of the winner popup
     keyboardEnabled = false,
     keyboardInspect = false,
     keyboardInspectSide = "RIGHT",
@@ -412,6 +414,7 @@ end
 -- Someone chose Need/Greed/Pass on this roll: refresh the counters.
 function CL.OnVotesChanged(rollID)
     CL.RollFrames.RefreshVotes(rollID)
+    if CL.Results then CL.Results.RefreshWaiting() end
 end
 
 -------------------------------------------------
@@ -423,6 +426,7 @@ watcher:RegisterEvent("START_LOOT_ROLL")
 watcher:RegisterEvent("CANCEL_LOOT_ROLL")
 watcher:RegisterEvent("LOOT_HISTORY_UPDATE_DROP")
 watcher:RegisterEvent("LOOT_ROLLS_COMPLETE")
+watcher:RegisterEvent("CONFIRM_LOOT_ROLL")
 watcher:RegisterEvent("PLAYER_ENTERING_WORLD")
 
 watcher:SetScript("OnEvent", function(_, event, arg1, arg2, arg3)
@@ -470,6 +474,20 @@ watcher:SetScript("OnEvent", function(_, event, arg1, arg2, arg3)
         -- the result of a finished roll lands in the history just after the "complete" event
         local ok, err = pcall(CL.Results.OnDropUpdate, arg2)
         if not ok then CL.Print("LOOT_HISTORY_UPDATE_DROP (result): " .. tostring(err)) end
+    elseif event == "CONFIRM_LOOT_ROLL" then
+        -- (rollID, rollType): the game asks to confirm a roll that binds the item. Left
+        -- alone, its own prompt shows and the roll frame stays until the game closes the
+        -- roll; with "accept bind-on-pickup prompts" we answer it and close the prompt.
+        CL.Debug("CONFIRM_LOOT_ROLL roll=%s type=%s (auto-accept %s)", tostring(Plain(arg1)), tostring(Plain(arg2)),
+            CL.db.autoConfirm and "on" or "off")
+        if CL.db.autoConfirm and ConfirmLootRoll then
+            local ok, err = pcall(ConfirmLootRoll, arg1, arg2)
+            if ok then
+                if StaticPopup_Hide then pcall(StaticPopup_Hide, "CONFIRM_LOOT_ROLL") end
+            else
+                CL.Print("ConfirmLootRoll failed: " .. tostring(err))
+            end
+        end
     elseif event == "LOOT_ROLLS_COMPLETE" then
         -- (lootListKey): everybody has answered or the time is up, the winner is known
         CL.Debug("LOOT_ROLLS_COMPLETE key=%s", tostring(Plain(arg1)))
