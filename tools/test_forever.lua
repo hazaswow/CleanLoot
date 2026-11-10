@@ -1147,20 +1147,26 @@ local mine
 for _, e in ipairs(waiting) do if e.key == 7001 then mine = e end end
 check(mine and mine.name == "Epic Thing" and #mine.pending == 2 and mine.pending[1].isSelf and mine.pending[1].name == "You"
     and mine.pending[2].name == "Jessa Rhodes", "a followed roll lists who has not answered, you first")
-local wrow
-for i = 1, 8 do
-    local r = R.WaitRow(i)
-    if r and r.item:IsShown() and r.item:GetText() == "Epic Thing" then wrow = r end
+-- the small card says "waiting on rolls"; hovering it lists the item, how many wait, then who
+local function epicLines()
+    local c = R.WaitCard()
+    GameTooltip:Hide()
+    c.__scripts.OnEnter(c)
+    for i, l in ipairs(GameTooltip.lines) do
+        if l:find("Epic Thing | ", 1, true) == 1 then return l, GameTooltip.lines[i + 1] end
+    end
 end
-check(wrow and wrow.count:GetText() == "2 players" and wrow.names:GetText():find("You", 1, true)
-    and wrow.names:GetText():find("Jessa Rhodes", 1, true), "...shown as the item, how many wait, then the names")
-check(R.WaitingShown(), "...on the waiting card")
+local head, names = epicLines()
+check(head == "Epic Thing | 2 players" and names and names:find("You", 1, true) and names:find("Jessa Rhodes", 1, true),
+    "hovering lists the item, how many wait, then the names")
+check(R.WaitingShown(), "...on the small waiting card")
 
 -- you answer: the update still reaches the card although the roll has no frame any more
 WOW.drops[7001].rollInfos[2].state, WOW.drops[7001].rollInfos[2].roll = 3, 10
 WOW.FireEvent("LOOT_HISTORY_UPDATE_DROP", 0, 7001)
 WOW.Advance(0.2)
-check(wrow.count:GetText() == "1 player" and not wrow.names:GetText():find("You", 1, true),
+head, names = epicLines()
+check(head == "Epic Thing | 1 player" and not names:find("You", 1, true),
     "answering takes you off the list, on a history update")
 -- the last player answers and the game names a winner: the item leaves the card
 WOW.drops[7001].rollInfos[1].state, WOW.drops[7001].rollInfos[1].roll = 3, 60

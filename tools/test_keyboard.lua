@@ -427,40 +427,55 @@ for _, entry in ipairs(K.ACTIONS) do
 end
 check(allNamed, "every binding has a readable name that carries the addon name")
 
--- Waiting on rolls: the items still being rolled for, how many players wait, who
+-- Waiting on rolls: a small card; hover it for the items, how many players wait, who
 RF.StopAll()
 local R = CL.Results
 CL.Sim.SetGroupSize(4)
 CL.db.growDirection, CL.db.resultsDirection = "DOWN", nil
+-- the lines of the card's tooltip: title, then for each item its header and its names
+local function waitTip()
+    local c = R.WaitCard()
+    GameTooltip:Hide()
+    c.__scripts.OnEnter(c)
+    return GameTooltip.lines
+end
 CL.Sim.Start(2)
 WOW.Advance(0.2)
 local simIDs = {}
 for id = 900001, 901000 do if CL.Sim.GetRoll(id) then simIDs[#simIDs + 1] = id end end
 check(#simIDs == 2 and R.WaitingShown(), "the waiting card shows while rolls wait for players")
+local wc = R.WaitCard()
+check(wc.title:GetText() == "Waiting on rolls" and wc:GetHeight() <= 30, "...as a small card with just its title")
+check(not GameTooltip:IsOwned(wc), "nothing else shows until the mouse is over it")
 local entries = R.Waiting()
 check(#entries == 2 and #entries[1].pending == 5 and entries[1].pending[1].isSelf == true
-    and entries[1].pending[2].name == "Aludra", "it lists each item with its players, you first")
-local wc = R.WaitCard()
-local row1, row2 = R.WaitRow(1), R.WaitRow(2)
-check(row1.item:GetText() == entries[1].name and row2.item:GetText() == entries[2].name,
-    "each item is named (" .. tostring(row1.item:GetText()) .. ")")
-check(row1.count:GetText() == "5 players" and row2.count:GetText() == "5 players", "...with how many players have not rolled")
-check(row1.names:GetText():find("You", 1, true) and row1.names:GetText():find("Aludra", 1, true)
-    and row1.names:GetText():find("Dorun", 1, true), "...then their names, yours included")
-local oneItemHeight = wc:GetHeight()
-check(oneItemHeight > 60, "the card is tall enough for both items (" .. tostring(oneItemHeight) .. ")")
+    and entries[1].pending[2].name == "Aludra", "it knows each item with its players, you first")
+local lines = waitTip()
+check(lines[1] == "Waiting on rolls" and lines[2] == entries[1].name .. " | 5 players"
+    and lines[4] == entries[2].name .. " | 5 players",
+    "hovering lists each item with how many players have not rolled (" .. tostring(lines[2]) .. ")")
+check(lines[3]:find("You", 1, true) and lines[3]:find("Aludra", 1, true) and lines[3]:find("Dorun", 1, true),
+    "...then their names, yours included")
+wc.__scripts.OnLeave(wc)
+check(not GameTooltip:IsShown(), "leaving the card hides the tooltip")
 
 -- you answer the first item: you are no longer waited for there, the others still are
 CL.Sim.Roll(simIDs[1], CL.ROLL.NEED)
 WOW.Advance(0.2)
-check(R.WaitRow(1).count:GetText() == "4 players" and not R.WaitRow(1).names:GetText():find("You", 1, true),
-    "answering removes you from that item")
-check(R.WaitRow(2).count:GetText() == "5 players" and R.WaitRow(2).names:GetText():find("You", 1, true),
+lines = waitTip()
+check(lines[2]:find("| 4 players", 1, true) and not lines[3]:find("You", 1, true), "answering removes you from that item")
+check(lines[4]:find("| 5 players", 1, true) and lines[5]:find("You", 1, true),
     "...but not from the one you have not answered")
 CL.Sim.Vote(simIDs[2], "Aludra", CL.ROLL.GREED)
 WOW.Advance(0.2)
-check(R.WaitRow(2).count:GetText() == "4 players" and not R.WaitRow(2).names:GetText():find("Aludra", 1, true),
+lines = waitTip()
+check(lines[4]:find("| 4 players", 1, true) and not lines[5]:find("Aludra", 1, true),
     "a player who rolled leaves the list of that item")
+-- a tooltip that is open follows the votes
+CL.Sim.Vote(simIDs[2], "Baric", CL.ROLL.PASS)
+WOW.Advance(0.2)
+check(GameTooltip.lines[4]:find("| 3 players", 1, true), "an open tooltip is refreshed when somebody rolls")
+wc.__scripts.OnLeave(wc)
 
 -- results stack after the waiting card
 local card = R.Show({ name = "x", quality = 3, rolls = {}, passes = 0,
@@ -478,11 +493,12 @@ R.Clear()
 
 -- a big group: the names are cut short
 CL.Sim.Clear()
-CL.Sim.SetGroupSize(20)
+CL.Sim.SetGroupSize(39)
 CL.Sim.Start(1)
 WOW.Advance(0.2)
-check(R.WaitRow(1).count:GetText() == "21 players" and R.WaitRow(1).names:GetText():find("more", 1, true),
-    "a long list of names is cut short")
+lines = waitTip()
+check(lines[2]:find("40 players", 1, true) and lines[3]:find("more", 1, true), "a very long list of names is cut short")
+wc.__scripts.OnLeave(wc)
 CL.Sim.Clear()
 WOW.Advance(0.2)
 check(not R.WaitingShown(), "no roll left: the card goes")

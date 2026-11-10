@@ -239,7 +239,7 @@ local function Build()
 
     -- the keys of controller mode, set here instead of hunting for them in Key Bindings
     Text(panel, "Key bindings", 330, -424, "GameFontNormalLarge")
-    Text(panel, "keys and gamepad buttons", 440, -429, "GameFontDisableSmall")
+    Text(panel, "keys and gamepad buttons", 478, -429, "GameFontDisableSmall")
     for i, entry in ipairs(CL.Keyboard.ACTIONS) do
         local col, row = (i - 1) % 2, math.floor((i - 1) / 2)
         local x, y = 330 + col * 150, -450 - row * 26
@@ -258,7 +258,7 @@ local function Build()
         function(v) CL.MinimapButton.SetHidden(v) end)
 
     Text(panel, "Controller mode", 16, -430, "GameFontNormalLarge")
-    widgets.keyboard = Checkbox(panel, "Enable controller mode (keyboard / gamepad rolls)", 16, -456,
+    widgets.keyboard = Checkbox(panel, "Enable controller mode", 16, -456,
         function() return CL.db.keyboardEnabled end,
         function(v) CL.Keyboard.SetEnabled(v) end)
     widgets.inspect = DependsOnKeyboard(Checkbox(panel, "Show an item inspection tooltip", 16, -480,
