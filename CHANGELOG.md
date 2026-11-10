@@ -1,9 +1,19 @@
 # Changelog
 
 ## 1.3.0
-- **Controller mode** (off by default, contributed by chuwix): select a visible roll and answer Need / Greed / Pass with bindings on keys or controller buttons, or `/cll` commands, and optionally show the item in a separate inspection tooltip. The keys and buttons are set from CleanLoot's options, or in Key Bindings under *CleanLoot*. The inspection is a checkbox, shows only while the mouse is over a roll (or, with *Keep it on the selected roll*, stays on the selection for a gamepad), and Pawn's information has its own checkbox. Every option of the mode is off by default, and they are all on a page of their own, *Controller mode*, under CleanLoot in the options (or `/cll controller`).
-- **Bind-on-pickup rolls**: the roll frame now stays until the game closes the roll, so refusing the game's confirmation prompt no longer loses the buttons (mouse and keys alike). New option *Auto-accept bind-on-pickup prompts* (off by default) accepts the prompt for you.
-- **Waiting on rolls**: a small card at the start of the winner popup while a roll is still open; hover it for the items still being rolled for, how many players have not rolled on each, then their names (class colours, you included while you have not answered). It follows the roll through the loot history, so an item you already answered stays until the others have. An option turns it off.
+
+**Controller mode** (new, off by default; contributed by chuwix)
+- Play the loot rolls with a gamepad or the keyboard: select a roll, then answer Need, Greed or Pass with keys or controller buttons, or with `/cll` commands.
+- Everything about it is on its own page of the options, *CleanLoot → Controller mode* (or `/cll controller`), and every option of the mode is off by default.
+- Set the keys and controller buttons right there (click a field, press a key or a button, right-click clears), or in Key Bindings under *CleanLoot*.
+- Optional item inspection tooltip: it shows while the mouse is over a roll or, for a gamepad, stays on the selected roll. Pawn upgrade info is an option too.
+
+**Bind-on-pickup rolls**
+- The roll frame now stays until the game closes the roll, so refusing the game's confirmation prompt no longer loses the buttons (mouse and keys alike).
+- New option *Auto-accept bind-on-pickup prompts* (off by default) accepts the prompt for you.
+
+**Winner popup**
+- New *Waiting on rolls* card: a small card at the start of the popup while a roll is still open. Hover it for the items still being rolled for, how many players have not rolled on each, and who (you included while you have not answered). On by default; one checkbox turns it off.
 
 ## 1.2.1
 - The winner popup has its own stacking direction (downwards or upwards) in the options, independent of the roll frames. Until you pick one it follows the roll frames, as before.
