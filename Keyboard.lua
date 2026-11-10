@@ -73,8 +73,17 @@ function K.Layout()
     end
 end
 
+-- The roll the inspection shows: the one under the mouse (default), or the selected one.
+local hoveredFrame, hoveredID
+
+local function InspectionFrame()
+    if CL.db.keyboardInspectHover then return hoveredFrame end
+    return selectedFrame
+end
+
 local function ShowInspection()
-    if not (CL.db.keyboardEnabled and CL.db.keyboardInspect and Eligible(selectedFrame)) then
+    local target = InspectionFrame()
+    if not (CL.db.keyboardEnabled and CL.db.keyboardInspect and Eligible(target)) then
         if inspection then inspection:Hide() end
         return
     end
@@ -82,15 +91,15 @@ local function ShowInspection()
     inspection:SetOwner(inspectionAnchor, "ANCHOR_NONE")
     K.Layout()
     inspection:ClearLines()
-    local link = CL.Plain(selectedFrame.link)
-    local name = CL.Plain(selectedFrame.itemName)
+    local link = CL.Plain(target.link)
+    local name = CL.Plain(target.itemName)
     local shown = false
     if link then shown = pcall(inspection.SetHyperlink, inspection, link) end
     if not shown then
-        local r, g, b = CL.QualityColor(selectedFrame.quality)
+        local r, g, b = CL.QualityColor(target.quality)
         inspection:SetText(name or "Item details unavailable", r, g, b)
     else
-        local pawnUpdate = rawget(_G, "PawnUpdateTooltip")
+        local pawnUpdate = CL.db.keyboardPawn ~= false and rawget(_G, "PawnUpdateTooltip")
         if type(pawnUpdate) == "function" then
             local ok, err = pcall(pawnUpdate, inspection:GetName(), "SetHyperlink", link)
             if not ok then CL.Debug("Pawn inspection update failed: %s", tostring(err)) end
@@ -237,8 +246,8 @@ function K.OnChanged()
     if selectedID and CL.RollFrames.GetFrame(selectedID) == selectedFrame then
         K.RefreshBindings()
         ShowInspection()
-    elseif CL.db.keyboardInspect then
-        Select(First())
+    elseif CL.db.keyboardInspect and not CL.db.keyboardInspectHover then
+        Select(First())   -- the inspection follows the selection: there is always one
     else
         Select(nil)
     end
@@ -246,6 +255,7 @@ end
 
 function K.OnRemoved(rollID, index, removedFrame)
     if removedFrame then removedFrame.selection:Hide() end
+    if hoveredFrame == removedFrame then hoveredFrame, hoveredID = nil, nil end
     if selectedID ~= rollID then
         K.OnChanged()
         return
@@ -271,13 +281,61 @@ end
 -- The inspection tooltip on or off (an option; also the Inspect binding).
 function K.SetInspect(enabled)
     CL.db.keyboardInspect = enabled and true or false
-    if CL.db.keyboardInspect and CL.db.keyboardEnabled and not selectedID then
+    if CL.db.keyboardInspect and CL.db.keyboardEnabled and not selectedID and not CL.db.keyboardInspectHover then
         Select(First())
     else
         ShowInspection()
     end
     K.Layout()
 end
+
+-- The mouse rolling over a roll shows its inspection, and leaving hides it; or, with this
+-- off, the inspection follows the selected roll and stays up (keys only, no mouse).
+function K.SetInspectHover(enabled)
+    CL.db.keyboardInspectHover = enabled and true or false
+    hoveredFrame, hoveredID = nil, nil
+    if CL.db.keyboardInspect and CL.db.keyboardEnabled and not CL.db.keyboardInspectHover and not selectedID then
+        Select(First())
+    else
+        ShowInspection()
+    end
+    K.Layout()
+end
+
+function K.SetPawn(enabled)
+    CL.db.keyboardPawn = enabled and true or false
+    ShowInspection()
+end
+
+-- Which roll the mouse is over, looked at a few times a second while it matters.
+function K.UpdateHover()
+    if not (CL.db and CL.db.keyboardEnabled and CL.db.keyboardInspect and CL.db.keyboardInspectHover) then
+        if hoveredFrame then
+            hoveredFrame, hoveredID = nil, nil
+            ShowInspection()
+        end
+        return
+    end
+    local target
+    for _, f in ipairs(CL.RollFrames.VisibleFrames()) do
+        if f.IsMouseOver and f:IsMouseOver() then target = f break end
+    end
+    local id = target and target.rollID or nil
+    if target ~= hoveredFrame or id ~= hoveredID then
+        hoveredFrame, hoveredID = target, id
+        ShowInspection()
+    end
+end
+
+local hoverWatcher = CreateFrame("Frame")
+hoverWatcher:Show()
+local sinceHoverCheck = 0
+hoverWatcher:SetScript("OnUpdate", function(_, elapsed)
+    sinceHoverCheck = sinceHoverCheck + (elapsed or 0)
+    if sinceHoverCheck < 0.1 then return end
+    sinceHoverCheck = 0
+    K.UpdateHover()
+end)
 
 function K.SetSide(side)
     CL.db.keyboardInspectSide = side == "LEFT" and "LEFT" or "RIGHT"

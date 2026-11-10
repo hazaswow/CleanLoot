@@ -30,6 +30,8 @@ local DEFAULTS = {
     showWaiting = true,  -- the "waiting on rolls" card at the start of the winner popup
     keyboardEnabled = false,
     keyboardInspect = false,
+    keyboardInspectHover = true,  -- the inspection tooltip only while the mouse is over a roll (off: it follows the selection)
+    keyboardPawn = true,  -- add Pawn's upgrade information to the inspection, when Pawn is installed
     keyboardInspectSide = "RIGHT",
 }
 

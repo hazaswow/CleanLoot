@@ -85,6 +85,7 @@ local function NewFrame(frameType, name, parent)
     set("GetWidth", function(self) return width end)
     set("GetHeight", function(self) return height end)
     -- no layout engine: a scenario that needs screen coordinates rawsets these
+    set("IsMouseOver", function(self) return rawget(self, "__mouseOver") == true end)  -- a scenario sets __mouseOver
     set("GetLeft", function(self) return nil end)
     set("GetBottom", function(self) return nil end)
     set("SetText", function(self, t) text = t end)

@@ -233,13 +233,18 @@ local function Build()
     widgets.resultsReset = PushButton(panel, "Reset", 420, -388, 80, function() CL.Results.ResetPosition() end)
 
     -- the keys of the keyboard rolls, set here instead of hunting for them in Key Bindings
-    Text(panel, "Key bindings", 330, -428, "GameFontNormalLarge")
+    Text(panel, "Key bindings", 330, -424, "GameFontNormalLarge")
     for i, entry in ipairs(CL.Keyboard.ACTIONS) do
         local col, row = (i - 1) % 2, math.floor((i - 1) / 2)
-        local x, y = 330 + col * 150, -456 - row * 28
+        local x, y = 330 + col * 150, -450 - row * 26
         Text(panel, entry.label, x, y - 5, "GameFontNormalSmall")
         widgets["key" .. i] = KeyField(panel, entry.action, x + 56, y, 90)
     end
+
+    Text(panel, "Testing", 330, -540, "GameFontNormalLarge")
+    widgets.sim = PushButton(panel, "Simulate 3 drops", 334, -564, 120, function() CL.Sim.Start(3) end)
+    widgets.simColors = PushButton(panel, "Each colour", 458, -564, 100, function() CL.Sim.Colors() end)
+    widgets.simClear = PushButton(panel, "Clear", 562, -564, 64, function() CL.Sim.Clear() end)
 
     Text(panel, "Minimap", 16, -368, "GameFontNormalLarge")
     widgets.minimap = Checkbox(panel, "Hide the minimap button", 16, -392,
@@ -250,22 +255,27 @@ local function Build()
     widgets.keyboard = Checkbox(panel, "Enable keyboard rolls", 16, -456,
         function() return CL.db.keyboardEnabled end,
         function(v) CL.Keyboard.SetEnabled(v) end)
-    widgets.inspect = DependsOnKeyboard(Checkbox(panel, "Show the selected item's inspection", 16, -480,
+    widgets.inspect = DependsOnKeyboard(Checkbox(panel, "Show an item inspection tooltip", 16, -480,
         function() return CL.db.keyboardInspect end,
         function(v) CL.Keyboard.SetInspect(v) end))
-    Text(panel, "Inspection side", 16, -512)
-    widgets.inspectRight = DependsOnKeyboard(Checkbox(panel, "Right", 128, -508,
+    widgets.inspectHover = DependsOnKeyboard(Checkbox(panel, "Only while hovering a roll", 16, -504,
+        function() return CL.db.keyboardInspectHover end,
+        function(v) CL.Keyboard.SetInspectHover(v) end))
+    widgets.pawn = DependsOnKeyboard(Checkbox(panel, "Include Pawn upgrade info", 16, -528,
+        function() return CL.db.keyboardPawn end,
+        function(v) CL.Keyboard.SetPawn(v) end))
+    local pawnSync = widgets.pawn.Sync
+    widgets.pawn.Sync = function()
+        pawnSync()
+        if not rawget(_G, "PawnUpdateTooltip") then widgets.pawn:Disable() end  -- nothing to include without Pawn
+    end
+    Text(panel, "Inspection side", 16, -560)
+    widgets.inspectRight = DependsOnKeyboard(Checkbox(panel, "Right", 128, -556,
         function() return CL.db.keyboardInspectSide ~= "LEFT" end,
         function() CL.Keyboard.SetSide("RIGHT") end))
-    widgets.inspectLeft = DependsOnKeyboard(Checkbox(panel, "Left", 230, -508,
+    widgets.inspectLeft = DependsOnKeyboard(Checkbox(panel, "Left", 230, -556,
         function() return CL.db.keyboardInspectSide == "LEFT" end,
         function() CL.Keyboard.SetSide("LEFT") end))
-
-    Text(panel, "Testing", 16, -544, "GameFontNormalLarge")
-    Text(panel, "Fake rolls with a simulated group.", 100, -549, "GameFontDisableSmall")
-    widgets.sim = PushButton(panel, "Simulate 3 drops", 20, -570, 150, function() CL.Sim.Start(3) end)
-    widgets.simColors = PushButton(panel, "One of each colour", 180, -570, 150, function() CL.Sim.Colors() end)
-    widgets.simClear = PushButton(panel, "Clear", 340, -570, 80, function() CL.Sim.Clear() end)
 
     -- values may have changed through a slash command since the panel was built
     panel:SetScript("OnShow", Options.Refresh)

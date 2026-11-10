@@ -39,6 +39,14 @@ check(CL.db.keyboardEnabled and K.SelectedID() == nil, "enabling with inspection
 check(W.inspect:IsEnabled() and W.inspectLeft:IsEnabled() and W.inspectRight:IsEnabled(),
     "...and the inspection options come alive")
 check(rawget(_G, "CleanLootInspectionToggle") == nil, "no inspection button is ever added to the roll stack")
+check(CL.db.keyboardInspectHover == true and CL.db.keyboardPawn == true,
+    "by default the inspection shows on hover only, with Pawn's information")
+check(W.inspectHover and W.pawn and W.inspectHover:IsEnabled() and not W.pawn:IsEnabled(),
+    "the hover option is there; the Pawn one is greyed out while Pawn is not installed")
+-- the next scenarios are about the persistent mode (the inspection follows the selection)
+W.inspectHover:SetChecked(false)
+W.inspectHover.__scripts.OnClick(W.inspectHover)
+check(CL.db.keyboardInspectHover == false, "unticking 'only while hovering' keeps the inspection up on the selection")
 W.inspect:SetChecked(true)
 W.inspect.__scripts.OnClick(W.inspect)
 check(CL.db.keyboardInspect and K.SelectedID() == 1001 and CleanLootInspectionTooltip:IsShown(),
@@ -236,6 +244,66 @@ check(RF.GetFrame(1201) == nil and K.SelectedID() == 1202, "synchronous cancella
 WOW.Advance(63)
 check(RF.GetFrame(1202) == nil and K.SelectedID() == nil and not tip:IsShown() and CL.db.keyboardInspect,
     "timer expiry clears selection while preserving the inspection toggle")
+
+-- Hover mode: the inspection shows while the mouse is over a roll, and only then
+RF.StopAll()
+W.inspectHover:SetChecked(true)
+W.inspectHover.__scripts.OnClick(W.inspectHover)
+check(CL.db.keyboardInspectHover == true and CL.db.keyboardInspect, "ticking 'only while hovering' switches to the mouse")
+local function startLink(id, link) return RF.Start(id, info(), link, 60000) end
+local h1, h2 = startLink(1401, "|Hitem:401|h[One]|h"), startLink(1402, "|Hitem:402|h[Two]|h")
+WOW.Advance(0.3)
+check(K.SelectedID() == nil and not tip:IsShown(), "nothing is selected or shown on its own")
+h1.__mouseOver = true
+WOW.Advance(0.3)
+check(tip:IsShown() and tip.link == "|Hitem:401|h[One]|h", "hovering a roll shows that item's inspection")
+h1.__mouseOver, h2.__mouseOver = false, true
+WOW.Advance(0.3)
+check(tip:IsShown() and tip.link == "|Hitem:402|h[Two]|h", "moving to another roll switches to its item")
+h2.__mouseOver = false
+WOW.Advance(0.3)
+check(not tip:IsShown(), "leaving the roll hides it")
+SlashCmdList.CLEANLOOT("next")
+check(K.SelectedID() == 1401 and not tip:IsShown(), "selecting with the keys does not bring the tooltip up in hover mode")
+h1.__mouseOver = true
+WOW.Advance(0.3)
+RF.Stop(1401)
+WOW.Advance(0.3)
+check(not tip:IsShown(), "a roll that closes under the mouse takes its tooltip with it")
+h1.__mouseOver = false
+-- Pawn's information can be left out
+local pawnAsked = 0
+PawnUpdateTooltip = function() pawnAsked = pawnAsked + 1 end
+W.pawn.Sync()
+check(W.pawn:IsEnabled(), "the Pawn option comes alive once Pawn is there")
+h2.__mouseOver = true
+WOW.Advance(0.3)
+check(tip:IsShown() and pawnAsked == 1, "Pawn is asked for the hovered item while the option is on")
+W.pawn:SetChecked(false)
+W.pawn.__scripts.OnClick(W.pawn)
+check(CL.db.keyboardPawn == false and pawnAsked == 1 and tip:IsShown(), "unticking it leaves Pawn out and keeps the tooltip")
+W.pawn:SetChecked(true)
+W.pawn.__scripts.OnClick(W.pawn)
+check(CL.db.keyboardPawn == true and pawnAsked == 2, "...and ticking brings it back")
+PawnUpdateTooltip = nil
+h2.__mouseOver = false
+-- with the inspection off or the keyboard rolls off, hovering shows nothing
+W.inspect:SetChecked(false)
+W.inspect.__scripts.OnClick(W.inspect)
+h2.__mouseOver = true
+WOW.Advance(0.3)
+check(not tip:IsShown(), "inspection off: hovering shows nothing")
+W.inspect:SetChecked(true)
+W.inspect.__scripts.OnClick(W.inspect)
+WOW.Advance(0.3)
+check(tip:IsShown(), "...and back on, the hovered roll shows again")
+K.SetEnabled(false)
+WOW.Advance(0.3)
+check(not tip:IsShown(), "keyboard rolls off: nothing shows")
+K.SetEnabled(true)
+h2.__mouseOver = false
+WOW.Advance(0.3)
+RF.StopAll()
 
 -- Answering by mouse and by key is the same: a bind-on-pickup roll keeps its frame
 RF.StopAll()
