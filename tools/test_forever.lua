@@ -1135,5 +1135,43 @@ check(CL.db.resultsDirection == "DOWN" and second[1] == "TOPLEFT", "...and back 
 CL.db.resultsDirection = nil
 R.Clear()
 
+-- 33. Waiting on rolls, from the loot history: items, how many wait, who (you included)
+CL.Sim.Clear()
+R.ForgetRolls()   -- earlier scenarios left some rolls followed
+WOW.Advance(0.2)
+Drop(7001, { Entry("Jessa Rhodes", "DRUID", 4), Entry("Hazas War", "WARRIOR", 4, nil, true), Entry("Za Bo", "HUNTER", 3, 50) })
+R.Watch(7001)   -- START_LOOT_ROLL told us this roll's key
+R.RefreshWaiting(true)
+local waiting = R.Waiting()
+local mine
+for _, e in ipairs(waiting) do if e.key == 7001 then mine = e end end
+check(mine and mine.name == "Epic Thing" and #mine.pending == 2 and mine.pending[1].isSelf and mine.pending[1].name == "You"
+    and mine.pending[2].name == "Jessa Rhodes", "a followed roll lists who has not answered, you first")
+local wrow
+for i = 1, 8 do
+    local r = R.WaitRow(i)
+    if r and r.item:IsShown() and r.item:GetText() == "Epic Thing" then wrow = r end
+end
+check(wrow and wrow.count:GetText() == "2 players" and wrow.names:GetText():find("You", 1, true)
+    and wrow.names:GetText():find("Jessa Rhodes", 1, true), "...shown as the item, how many wait, then the names")
+check(R.WaitingShown(), "...on the waiting card")
+
+-- you answer: the update still reaches the card although the roll has no frame any more
+WOW.drops[7001].rollInfos[2].state, WOW.drops[7001].rollInfos[2].roll = 3, 10
+WOW.FireEvent("LOOT_HISTORY_UPDATE_DROP", 0, 7001)
+WOW.Advance(0.2)
+check(wrow.count:GetText() == "1 player" and not wrow.names:GetText():find("You", 1, true),
+    "answering takes you off the list, on a history update")
+-- the last player answers and the game names a winner: the item leaves the card
+WOW.drops[7001].rollInfos[1].state, WOW.drops[7001].rollInfos[1].roll = 3, 60
+WOW.drops[7001].rollInfos[1].isWinner = true
+WOW.drops[7001].winner = WOW.drops[7001].rollInfos[1]
+WOW.FireEvent("LOOT_HISTORY_UPDATE_DROP", 0, 7001)
+WOW.Advance(0.2)
+local still = false
+for _, e in ipairs(R.Waiting()) do if e.key == 7001 then still = true end end
+check(not still and not R.WaitingShown(), "a decided roll is no longer waited for")
+R.Clear()
+
 io.write(("%d checks, %d failed\n"):format(checks, failures))
 os.exit(failures == 0 and 0 or 1)

@@ -99,6 +99,12 @@ local function NewFrame(frameType, name, parent)
         set("GetFont", function() return font, fontSize, fontFlags end)
         set("SetFont", function(self, f, size, flags) font, fontSize, fontFlags = f, size, flags end)
         set("GetStringWidth", function() return #tostring(text) * fontSize * 0.6 end)
+        -- wrapped text: as many lines as the width allows (colour codes take no room)
+        set("GetStringHeight", function()
+            local plain = tostring(text):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+            local w = (width and width > 0) and width or 1000
+            return math.max(1, math.ceil(#plain * fontSize * 0.6 / w)) * (fontSize + 2)
+        end)
     end
     if frameType == "GameTooltip" then
         rawset(f, "lines", {})

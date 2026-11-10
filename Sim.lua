@@ -227,6 +227,25 @@ function Sim.GetVotes(rollID)
     return votes
 end
 
+-- The simulated rolls still waiting for players, in the shape CL.API.GetWaiting documents.
+function Sim.Waiting()
+    local ids = {}
+    for rollID in pairs(rolls) do ids[#ids + 1] = rollID end
+    table.sort(ids)
+    local list = {}
+    for _, rollID in ipairs(ids) do
+        local s = rolls[rollID]
+        local pending = {}
+        if s.mine == nil then pending[1] = { name = "You", isSelf = true } end  -- you have not answered yet
+        for _, name in ipairs(PLAYERS) do
+            if not s.choices[name] then pending[#pending + 1] = { name = name, class = PlayerClass(name) } end
+        end
+        list[#list + 1] = { key = rollID, name = s.info.name, quality = s.info.quality,
+            texture = s.info.texture, pending = pending }
+    end
+    return list
+end
+
 -- Players make up their minds at random moments while the timer runs; a few
 -- never answer, like in a real group.
 local function ScheduleVotes(rollID)
@@ -243,6 +262,7 @@ function Sim.Roll(rollID, rollType)
     local s = rolls[rollID]
     if not s or s.mine ~= nil then return false end
     s.mine = rollType
+    CL.OnVotesChanged(rollID)  -- you are no longer waited for
     After(1 + math.random() * 2, function() Sim.Finish(rollID) end)
     return true
 end

@@ -28,6 +28,8 @@ local free = {}      -- cards not in use
 local active = {}    -- cards on screen, oldest first
 local anchor
 local waitCard       -- "waiting on rolls": first in the stack, only while somebody has not rolled
+local open = {}      -- lootListKey -> time first known: rolls followed until the game names a winner
+local shown = {}     -- lootListKey -> true: result already announced
 
 -------------------------------------------------
 -- Position: its own anchor, same lock rule as the roll frames
@@ -222,48 +224,55 @@ local function CreateCard()
 end
 
 -------------------------------------------------
--- "Waiting on rolls": who has not answered yet, across the rolls on screen
+-- "Waiting on rolls": the items still being rolled for, and who has not answered
 -------------------------------------------------
--- { { name, class, count }, ... }, most rolls missing first, and how many rolls are on screen.
-local function PendingPlayers()
-    local byName, list, total = {}, {}, 0
-    for _, f in ipairs(CL.RollFrames.VisibleFrames()) do
-        total = total + 1
-        local pending = f.votes and f.votes.pending
-        if pending then
-            for _, p in ipairs(pending) do
-                local rec = byName[p.name]
-                if not rec then
-                    rec = { name = p.name, class = p.class, count = 0 }
-                    byName[p.name] = rec
-                    list[#list + 1] = rec
-                end
-                rec.count = rec.count + 1
-            end
+local MAX_WAIT_ITEMS, MAX_WAIT_NAMES = 8, 12
+local waitRows = {}      -- one row per item: its name, how many wait, who
+local waitEntries = {}   -- what the card shows now
+local waitQueued         -- a refresh is already scheduled
+
+-- The rolls still waiting for somebody, oldest first:
+--   { { key, name, quality, pending = { { name, class, isSelf }, ... } }, ... }
+-- Real drops come from the loot history through the rolls being followed (so a roll
+-- you have already answered still counts, you included while you have not answered),
+-- simulated ones from the simulator.
+local function WaitingEntries()
+    local keys = {}
+    for key, since in pairs(open) do
+        if not shown[key] then keys[#keys + 1] = { key = key, since = since } end
+    end
+    table.sort(keys, function(a, b)
+        if a.since ~= b.since then return a.since < b.since end
+        return tostring(a.key) < tostring(b.key)
+    end)
+    local list = {}
+    for _, k in ipairs(keys) do
+        local e = CL.API.GetWaiting(k.key)
+        if e and #e.pending > 0 then list[#list + 1] = e end
+    end
+    if CL.Sim and CL.Sim.Waiting then
+        for _, e in ipairs(CL.Sim.Waiting()) do
+            if #e.pending > 0 then list[#list + 1] = e end
         end
     end
-    table.sort(list, function(a, b)
-        if a.count ~= b.count then return a.count > b.count end
-        return tostring(a.name) < tostring(b.name)
-    end)
-    return list, total
+    return list
 end
 
-local function ShowWaitingTooltip(card)
-    local players, total = PendingPlayers()
-    if #players == 0 then return end
-    GameTooltip:SetOwner(card, "ANCHOR_RIGHT")
-    GameTooltip:AddLine(("Hasn't rolled yet (%d)"):format(#players), 1, 1, 1)
-    for _, p in ipairs(players) do
-        local r, g, b = ClassColor(p.class)
-        if total > 1 then
-            -- on how many of the rolls on screen this player is still undecided
-            GameTooltip:AddDoubleLine(ShortName(p.name), ("%d/%d"):format(p.count, total), r, g, b, 0.7, 0.7, 0.7)
+-- "Aludra, Baric, You": class colours, you in gold, the long lists cut short.
+local function WaitNames(pending)
+    local parts = {}
+    for i, p in ipairs(pending) do
+        if i > MAX_WAIT_NAMES then
+            parts[#parts + 1] = ("|cffb3b3b3+%d more|r"):format(#pending - MAX_WAIT_NAMES)
+            break
+        end
+        if p.isSelf then
+            parts[#parts + 1] = GOLD .. "You|r"
         else
-            GameTooltip:AddLine(ShortName(p.name), r, g, b)
+            parts[#parts + 1] = Hex(ClassColor(p.class)) .. ShortName(p.name) .. "|r"
         end
     end
-    GameTooltip:Show()
+    return table.concat(parts, ", ")
 end
 
 local function CreateWaitCard()
@@ -278,21 +287,17 @@ local function CreateWaitCard()
     f:Hide()
 
     f.icon = f:CreateTexture(nil, "ARTWORK")
-    f.icon:SetSize(24, 24)
-    f.icon:SetPoint("LEFT", f, "LEFT", 8, 0)
+    f.icon:SetSize(16, 16)
+    f.icon:SetPoint("TOPLEFT", f, "TOPLEFT", 8, -6)
     f.icon:SetTexture("Interface\\ICONS\\INV_Misc_PocketWatch_02")  -- the clock of the roll frames
     f.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-
     f.title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    f.title:SetPoint("TOPLEFT", f.icon, "TOPRIGHT", 6, 2)
+    f.title:SetPoint("LEFT", f.icon, "RIGHT", 6, 0)
     f.title:SetJustifyH("LEFT")
     f.title:SetText("Waiting on rolls")
-    f.line = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    f.line:SetPoint("TOPLEFT", f.title, "BOTTOMLEFT", 0, -2)
-    f.line:SetJustifyH("LEFT")
+    f.more = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    f.more:SetJustifyH("LEFT")
 
-    f:SetScript("OnEnter", function(self) ShowWaitingTooltip(self) end)
-    f:SetScript("OnLeave", function() GameTooltip:Hide() end)
     f:SetScript("OnDragStart", function(self)
         if not Results.CanMove() then return end
         self.dragging = true
@@ -307,25 +312,99 @@ local function CreateWaitCard()
     return f
 end
 
--- Show the card while some roll on screen still has players who have not answered,
--- hide it otherwise (or when the option is off).
-function Results.RefreshWaiting()
-    local players = {}
-    if CL.db and CL.db.showWaiting then players = PendingPlayers() end
-    if #players == 0 then
+local function WaitRow(card, i)
+    local row = waitRows[i]
+    if row then return row end
+    row = {}
+    row.item = card:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    row.item:SetJustifyH("LEFT")
+    row.item:SetWordWrap(false)
+    row.item:SetSize(CARD_W - 100, 13)
+    row.count = card:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    row.count:SetJustifyH("RIGHT")
+    row.names = card:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    row.names:SetJustifyH("LEFT")
+    row.names:SetWordWrap(true)
+    row.names:SetWidth(CARD_W - 20)
+    waitRows[i] = row
+    return row
+end
+
+-- One block per item: its name (quality colour) and how many players wait, then who.
+local function FillWaitCard(card, entries)
+    local y = -28   -- below the title
+    local count = math.min(#entries, MAX_WAIT_ITEMS)
+    for i = 1, count do
+        local e, row = entries[i], WaitRow(card, i)
+        local r, g, b = CL.QualityColor(e.quality)
+        local n = #e.pending
+        row.item:SetText(e.name or "?")
+        row.item:SetTextColor(r, g, b)
+        row.item:ClearAllPoints()
+        row.item:SetPoint("TOPLEFT", card, "TOPLEFT", 10, y)
+        row.count:SetText(n == 1 and "1 player" or ("%d players"):format(n))
+        row.count:ClearAllPoints()
+        row.count:SetPoint("TOPRIGHT", card, "TOPRIGHT", -10, y)
+        row.names:SetText(WaitNames(e.pending))
+        row.names:ClearAllPoints()
+        row.names:SetPoint("TOPLEFT", card, "TOPLEFT", 10, y - 14)
+        row.item:Show()
+        row.count:Show()
+        row.names:Show()
+        local h = row.names:GetStringHeight()
+        if type(h) ~= "number" or h < 10 then h = 12 end
+        y = y - 14 - h - 6
+    end
+    for i = count + 1, #waitRows do
+        waitRows[i].item:Hide()
+        waitRows[i].count:Hide()
+        waitRows[i].names:Hide()
+    end
+    if #entries > count then
+        card.more:SetText(("+%d more items"):format(#entries - count))
+        card.more:ClearAllPoints()
+        card.more:SetPoint("TOPLEFT", card, "TOPLEFT", 10, y)
+        card.more:Show()
+        y = y - 16
+    else
+        card.more:Hide()
+    end
+    card:SetHeight(-y + 2)
+end
+
+local function RefreshWaitingNow()
+    local entries = {}
+    if CL.db and CL.db.showWaiting then entries = WaitingEntries() end
+    waitEntries = entries
+    if #entries == 0 then
         if waitCard and waitCard:IsShown() then
-            if GameTooltip:IsShown() and GameTooltip:IsOwned(waitCard) then GameTooltip:Hide() end
             waitCard:Hide()
             Results.Layout()
         end
         return
     end
     waitCard = waitCard or CreateWaitCard()
-    waitCard.line:SetText(#players == 1 and "1 player hasn't rolled" or ("%d players haven't rolled"):format(#players))
+    FillWaitCard(waitCard, entries)
     local wasShown = waitCard:IsShown()
     waitCard:Show()
     if not wasShown then Results.Layout() end
-    if GameTooltip:IsShown() and GameTooltip:IsOwned(waitCard) then ShowWaitingTooltip(waitCard) end
+end
+
+-- Show the card while some roll still waits for somebody, hide it otherwise (or when
+-- the option is off). Votes come in bursts: refreshes are merged into one a moment
+-- later, unless `now`.
+function Results.RefreshWaiting(now)
+    if now then
+        waitQueued = nil
+        RefreshWaitingNow()
+        return
+    end
+    if waitQueued then return end
+    waitQueued = true
+    C_Timer.After(0.1, function()
+        waitQueued = nil
+        RefreshWaitingNow()
+    end)
 end
 
 function Results.WaitingShown()
@@ -334,6 +413,22 @@ end
 
 function Results.WaitCard()
     return waitCard
+end
+
+function Results.WaitRow(index)
+    return waitRows[index]
+end
+
+-- Stop following every roll (a clean slate; the tests use it between scenarios).
+function Results.ForgetRolls()
+    for key in pairs(open) do open[key] = nil end
+    for key in pairs(shown) do shown[key] = nil end
+    Results.RefreshWaiting(true)
+end
+
+-- What the card lists now (see WaitingEntries).
+function Results.Waiting()
+    return waitEntries
 end
 
 -- The popup stacks its own way: its own setting, else the roll frames' direction.
@@ -489,14 +584,15 @@ end
 -- is ours), a history update that still shows no winner, and LOOT_ROLLS_COMPLETE.
 -- The complete event's key can be unreadable (a secret value), so a sweep over all
 -- the rolls being followed does the looking, not that one key.
-local open = {}    -- lootListKey -> time first known: rolls waiting for their winner
-local shown = {}   -- lootListKey -> true: already announced
+-- (open: lootListKey -> time first known, the rolls waiting for their winner; shown:
+-- lootListKey -> true once announced -- both declared at the top, the waiting card reads them)
 local OPEN_FOR = 900  -- seconds; a roll lasts three minutes at most
 
 local function Announce(key, res)
     open[key] = nil
     shown[key] = true
     Results.Cover(res.name, 30)   -- the winner's toast comes with the result
+    Results.RefreshWaiting()      -- decided: no longer waited for
     local card = Results.Show(res)
     CL.Debug("result %s: %s won %s -> %s", tostring(key), tostring(res.winner.name), tostring(res.name),
         card and "card shown" or "popup is off")
@@ -534,6 +630,7 @@ end
 function Results.Watch(key)
     key = CL.Plain(key)
     if key ~= nil and not shown[key] then open[key] = open[key] or GetTime() end
+    Results.RefreshWaiting()
 end
 
 -- LOOT_ROLLS_COMPLETE: the roll is over. The winner reaches the history a moment
@@ -545,6 +642,7 @@ function Results.OnComplete(key)
     if key ~= nil and not shown[key] then open[key] = open[key] or GetTime() end
     Sweep()
     for _, delay in ipairs(RETRY_DELAYS) do C_Timer.After(delay, Sweep) end
+    Results.RefreshWaiting()
 end
 
 -- LOOT_HISTORY_UPDATE_DROP: somebody's choice or the result changed.
@@ -555,4 +653,7 @@ function Results.OnDropUpdate(key)
     else
         Consider(key, true)
     end
+    -- every choice somebody makes lands here: the waiting card follows it, also for a
+    -- roll you have already answered (it has no frame any more)
+    Results.RefreshWaiting()
 end

@@ -227,7 +227,7 @@ local function Build()
         function() return CL.db.showWaiting end,
         function(v)
             CL.db.showWaiting = v
-            CL.Results.RefreshWaiting()
+            CL.Results.RefreshWaiting(true)
         end)
     widgets.resultsMove = PushButton(panel, "Move", 334, -388, 80, function() CL.Results.ToggleSample() end)
     widgets.resultsReset = PushButton(panel, "Reset", 420, -388, 80, function() CL.Results.ResetPosition() end)

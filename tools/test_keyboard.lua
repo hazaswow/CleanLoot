@@ -350,25 +350,42 @@ for _, entry in ipairs(K.ACTIONS) do
 end
 check(allNamed, "every binding has a readable name that carries the addon name")
 
--- Waiting on rolls: the card at the start of the popup
+-- Waiting on rolls: the items still being rolled for, how many players wait, who
 RF.StopAll()
 local R = CL.Results
 CL.Sim.SetGroupSize(4)
 CL.db.growDirection, CL.db.resultsDirection = "DOWN", nil
 CL.Sim.Start(2)
+WOW.Advance(0.2)
 local simIDs = {}
-for id = 900001, 901000 do if RF.GetFrame(id) then simIDs[#simIDs + 1] = id end end
-check(#simIDs == 2 and R.WaitingShown(), "the waiting card shows while players have not rolled")
+for id = 900001, 901000 do if CL.Sim.GetRoll(id) then simIDs[#simIDs + 1] = id end end
+check(#simIDs == 2 and R.WaitingShown(), "the waiting card shows while rolls wait for players")
+local entries = R.Waiting()
+check(#entries == 2 and #entries[1].pending == 5 and entries[1].pending[1].isSelf == true
+    and entries[1].pending[2].name == "Aludra", "it lists each item with its players, you first")
 local wc = R.WaitCard()
-check(wc.line:GetText() == "4 players haven't rolled", "...counting each player once (" .. tostring(wc.line:GetText()) .. ")")
-wc.__scripts.OnEnter(wc)
-local waitTip = table.concat(GameTooltip.lines, "\n")
-check(waitTip:find("Hasn't rolled yet (4)", 1, true) and waitTip:find("Aludra | 2/2", 1, true),
-    "hovering lists them with how many of the rolls on screen they are undecided on")
-CL.Sim.Vote(simIDs[1], "Aludra", CL.ROLL.NEED)
-check(wc.line:GetText() == "4 players haven't rolled", "a player who rolled on one item is still waited for on the other")
+local row1, row2 = R.WaitRow(1), R.WaitRow(2)
+check(row1.item:GetText() == entries[1].name and row2.item:GetText() == entries[2].name,
+    "each item is named (" .. tostring(row1.item:GetText()) .. ")")
+check(row1.count:GetText() == "5 players" and row2.count:GetText() == "5 players", "...with how many players have not rolled")
+check(row1.names:GetText():find("You", 1, true) and row1.names:GetText():find("Aludra", 1, true)
+    and row1.names:GetText():find("Dorun", 1, true), "...then their names, yours included")
+local oneItemHeight = wc:GetHeight()
+check(oneItemHeight > 60, "the card is tall enough for both items (" .. tostring(oneItemHeight) .. ")")
+
+-- you answer the first item: you are no longer waited for there, the others still are
+CL.Sim.Roll(simIDs[1], CL.ROLL.NEED)
+WOW.Advance(0.2)
+check(R.WaitRow(1).count:GetText() == "4 players" and not R.WaitRow(1).names:GetText():find("You", 1, true),
+    "answering removes you from that item")
+check(R.WaitRow(2).count:GetText() == "5 players" and R.WaitRow(2).names:GetText():find("You", 1, true),
+    "...but not from the one you have not answered")
 CL.Sim.Vote(simIDs[2], "Aludra", CL.ROLL.GREED)
-check(wc.line:GetText() == "3 players haven't rolled", "...and not any more once both are answered")
+WOW.Advance(0.2)
+check(R.WaitRow(2).count:GetText() == "4 players" and not R.WaitRow(2).names:GetText():find("Aludra", 1, true),
+    "a player who rolled leaves the list of that item")
+
+-- results stack after the waiting card
 local card = R.Show({ name = "x", quality = 3, rolls = {}, passes = 0,
     winner = { name = "Z", class = "MAGE", type = CL.ROLL.GREED, value = 5 } }, true)
 local cp = { card:GetPoint() }
@@ -381,11 +398,28 @@ check(wp[1] == "BOTTOMLEFT" and cp[1] == "BOTTOMLEFT" and cp[2] == wc and cp[3] 
     "...and going up the waiting card stays first, at the bottom")
 CL.db.resultsDirection = nil
 R.Clear()
+
+-- a big group: the names are cut short
+CL.Sim.Clear()
+CL.Sim.SetGroupSize(20)
+CL.Sim.Start(1)
+WOW.Advance(0.2)
+check(R.WaitRow(1).count:GetText() == "21 players" and R.WaitRow(1).names:GetText():find("more", 1, true),
+    "a long list of names is cut short")
+CL.Sim.Clear()
+WOW.Advance(0.2)
+check(not R.WaitingShown(), "no roll left: the card goes")
+CL.Sim.SetGroupSize(4)
+
+-- the options
+CL.Sim.Start(1)
+WOW.Advance(0.2)
+check(R.WaitingShown(), "...and comes back with the next roll")
 CL.db.showWaiting = false
-R.RefreshWaiting()
+R.RefreshWaiting(true)
 check(not R.WaitingShown(), "the option turns the waiting card off")
 CL.db.showWaiting = true
-R.RefreshWaiting()
+R.RefreshWaiting(true)
 check(R.WaitingShown(), "...and back on")
 local ww = CL.Options.widgets.waiting
 check(ww ~= nil, "the options panel has the waiting checkbox")
@@ -395,9 +429,13 @@ check(CL.db.showWaiting == false and not R.WaitingShown(), "unticking it hides t
 ww:SetChecked(true)
 ww.__scripts.OnClick(ww)
 check(CL.db.showWaiting == true and R.WaitingShown(), "...and ticking shows it again")
-for _, name in ipairs({ "Aludra", "Baric", "Cyndra", "Dorun" }) do
-    for _, id in ipairs(simIDs) do CL.Sim.Vote(id, name, CL.ROLL.PASS) end
+for id = 900001, 901000 do
+    if CL.Sim.GetRoll(id) then
+        CL.Sim.Roll(id, CL.ROLL.PASS)
+        for _, name in ipairs({ "Aludra", "Baric", "Cyndra", "Dorun" }) do CL.Sim.Vote(id, name, CL.ROLL.PASS) end
+    end
 end
+WOW.Advance(0.2)
 check(not R.WaitingShown(), "once everyone has rolled the card goes")
 CL.Sim.Clear()
 R.Clear()

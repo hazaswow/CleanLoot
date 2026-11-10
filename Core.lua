@@ -303,6 +303,35 @@ function API.GetResult(lootKey)
     return res
 end
 
+-- Who has not answered a roll yet, from the loot history (also for a roll you have
+-- already answered, which no longer has a frame):
+--   { key, name, quality, texture, pending = { { name, class, isSelf }, ... } }
+-- You are in the list while you have not answered either. nil when the drop is
+-- unknown or already decided (a winner, or everyone passed).
+function API.GetWaiting(lootKey)
+    lootKey = Plain(lootKey)
+    if lootKey == nil then return nil end
+    local drop = FindDrop(lootKey)
+    if not drop or type(drop.rollInfos) ~= "table" then return nil end
+    if type(drop.winner) == "table" or Plain(drop.allPassed) == true then return nil end
+
+    local res = { key = lootKey, pending = {} }
+    res.name, res.quality, res.texture = ItemFacts(Plain(drop.itemHyperlink))
+    for _, info in ipairs(drop.rollInfos) do
+        if Plain(info.state) == NO_ROLL then
+            local isSelf = Plain(info.isSelf) == true
+            local entry = { name = isSelf and "You" or Plain(info.playerName) or "?",
+                class = Plain(info.playerClass), isSelf = isSelf }
+            if isSelf then
+                table.insert(res.pending, 1, entry)  -- you first
+            else
+                res.pending[#res.pending + 1] = entry
+            end
+        end
+    end
+    return res
+end
+
 function API.Roll(rollID, rollType)
     local sim = CL.Sim and CL.Sim.GetRoll(rollID)
     if sim then return CL.Sim.Roll(rollID, rollType) end
