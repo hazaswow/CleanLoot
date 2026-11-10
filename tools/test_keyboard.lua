@@ -23,30 +23,30 @@ function GetBindingKey(action) return WOW.bindings[action] end
 function GetBindingText(key) return "key:" .. key end
 LOOT_ROLL_INELIGIBLE_REASON3 = "Cannot Need this."
 
-check(CL.db.keyboardEnabled == false and CL.db.keyboardInspect == false, "keyboard and inspection default off")
+check(CL.db.keyboardEnabled == false and CL.db.keyboardInspect == false and CL.db.keyboardInspectSticky == false
+    and CL.db.keyboardPawn == false and CL.db.keyboardInspectSide == "RIGHT", "every controller-mode setting is off by default")
 local a, b = start(1001), start(1002)
 check(rawget(_G, "CleanLootInspectionToggle") == nil, "disabled keyboard rolls do not show an inspection button")
 SlashCmdList.CLEANLOOT("need")
 check(K.SelectedID() == nil and #rolls == 0 and not a.selection:IsShown(), "disabled commands do not select or roll")
 check(not a.buttons[CL.ROLL.NEED].binding:IsShown(), "bindings are hidden when keyboard rolls are disabled")
 local W = CL.Options.widgets
-check(W.keyboard and W.inspect and W.inspectLeft and W.inspectRight, "keyboard settings exist (inspection is a checkbox)")
-check(not W.inspect:IsEnabled() and not W.inspectLeft:IsEnabled() and not W.inspectRight:IsEnabled(),
+check(W.keyboard and W.inspect and W.inspectSticky and W.inspectLeft, "controller-mode settings exist (inspection is a checkbox)")
+check(not W.inspect:IsEnabled() and not W.inspectSticky:IsEnabled() and not W.inspectLeft:IsEnabled(),
     "the inspection options are greyed out while keyboard rolls are off")
 W.keyboard:SetChecked(true)
 W.keyboard.__scripts.OnClick(W.keyboard)
 check(CL.db.keyboardEnabled and K.SelectedID() == nil, "enabling with inspection off leaves the stack unchanged")
-check(W.inspect:IsEnabled() and W.inspectLeft:IsEnabled() and W.inspectRight:IsEnabled(),
+check(W.inspect:IsEnabled() and W.inspectSticky:IsEnabled() and W.inspectLeft:IsEnabled(),
     "...and the inspection options come alive")
 check(rawget(_G, "CleanLootInspectionToggle") == nil, "no inspection button is ever added to the roll stack")
-check(CL.db.keyboardInspectHover == true and CL.db.keyboardPawn == true,
-    "by default the inspection shows on hover only, with Pawn's information")
-check(W.inspectHover and W.pawn and W.inspectHover:IsEnabled() and not W.pawn:IsEnabled(),
-    "the hover option is there; the Pawn one is greyed out while Pawn is not installed")
+check(W.inspectSticky and W.pawn and W.inspectSticky:IsEnabled() and not W.pawn:IsEnabled(),
+    "the sticky option is there; the Pawn one is greyed out while Pawn is not installed")
 -- the next scenarios are about the persistent mode (the inspection follows the selection)
-W.inspectHover:SetChecked(false)
-W.inspectHover.__scripts.OnClick(W.inspectHover)
-check(CL.db.keyboardInspectHover == false, "unticking 'only while hovering' keeps the inspection up on the selection")
+W.inspectSticky:SetChecked(true)
+W.inspectSticky.__scripts.OnClick(W.inspectSticky)
+check(CL.db.keyboardInspectSticky == true, "ticking 'keep it on the selected roll' keeps the inspection up on the selection")
+K.SetPawn(true)   -- Pawn's information is on for these scenarios
 W.inspect:SetChecked(true)
 W.inspect.__scripts.OnClick(W.inspect)
 check(CL.db.keyboardInspect and K.SelectedID() == 1001 and CleanLootInspectionTooltip:IsShown(),
@@ -57,9 +57,12 @@ check(not CL.db.keyboardInspect and not CleanLootInspectionTooltip:IsShown() and
     "unticking it disables inspection without clearing selection")
 CL.db.growDirection = "UP"
 RF.Layout()
+W.inspectLeft:SetChecked(true)
 W.inspectLeft.__scripts.OnClick(W.inspectLeft)
 check(CL.db.keyboardInspectSide == "LEFT", "the side can be set while the tooltip is hidden")
-W.inspectRight.__scripts.OnClick(W.inspectRight)
+W.inspectLeft:SetChecked(false)
+W.inspectLeft.__scripts.OnClick(W.inspectLeft)
+check(CL.db.keyboardInspectSide == "RIGHT", "...and back to the right")
 CL.db.growDirection = "DOWN"
 RF.Layout()
 K.SetEnabled(false)
@@ -140,9 +143,11 @@ SlashCmdList.CLEANLOOT("next")
 check(K.SelectedID() == 1003 and tip:IsShown() and tip.link == c.link,
     "Pawn errors leave inspection usable")
 PawnUpdateTooltip = nil
+CL.Options.widgets.inspectLeft:SetChecked(true)
 CL.Options.widgets.inspectLeft.__scripts.OnClick(CL.Options.widgets.inspectLeft)
 check(CL.db.keyboardInspectSide == "LEFT" and (tip:GetPoint()) == "TOPRIGHT", "inspection side can be set to left")
-CL.Options.widgets.inspectRight.__scripts.OnClick(CL.Options.widgets.inspectRight)
+CL.Options.widgets.inspectLeft:SetChecked(false)
+CL.Options.widgets.inspectLeft.__scripts.OnClick(CL.Options.widgets.inspectLeft)
 check(CL.db.keyboardInspectSide == "RIGHT" and (tip:GetPoint()) == "TOPLEFT", "inspection side can be set to right")
 RF.Stop(1003)
 check(K.SelectedID() == nil and not tip:IsShown() and CL.db.keyboardInspect,
@@ -247,9 +252,9 @@ check(RF.GetFrame(1202) == nil and K.SelectedID() == nil and not tip:IsShown() a
 
 -- Hover mode: the inspection shows while the mouse is over a roll, and only then
 RF.StopAll()
-W.inspectHover:SetChecked(true)
-W.inspectHover.__scripts.OnClick(W.inspectHover)
-check(CL.db.keyboardInspectHover == true and CL.db.keyboardInspect, "ticking 'only while hovering' switches to the mouse")
+W.inspectSticky:SetChecked(false)
+W.inspectSticky.__scripts.OnClick(W.inspectSticky)
+check(CL.db.keyboardInspectSticky == false and CL.db.keyboardInspect, "unticking 'keep it on the selected roll' switches back to the mouse")
 local function startLink(id, link) return RF.Start(id, info(), link, 60000) end
 local h1, h2 = startLink(1401, "|Hitem:401|h[One]|h"), startLink(1402, "|Hitem:402|h[Two]|h")
 WOW.Advance(0.3)
@@ -400,6 +405,10 @@ passKey.__scripts.OnKeyDown(passKey, "ESCAPE")
 check(WOW.bindings.CLEANLOOT_PASS == "SHIFT-F5" and passKey:GetText() == "key:SHIFT-F5", "Escape cancels without changing the key")
 passKey.__scripts.OnClick(passKey, "RightButton")
 check(WOW.bindings.CLEANLOOT_PASS == nil and passKey:GetText() == "Not bound", "right-click clears the key")
+needKey.__scripts.OnClick(needKey, "LeftButton")
+needKey.__scripts.OnGamePadButtonDown(needKey, "PAD1")
+check(WOW.bindings.CLEANLOOT_NEED == "PAD1" and needKey:GetText() == "key:PAD1", "a controller button can be bound, like a key")
+needKey.__scripts.OnClick(needKey, "RightButton")
 local savesBefore = bindingSaves
 WOW.combat = true
 needKey.__scripts.OnClick(needKey, "LeftButton")

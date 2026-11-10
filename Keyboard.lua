@@ -1,6 +1,6 @@
--- Keyboard rolls (opt-in): select a visible roll, inspect it, answer Need / Greed / Pass
--- with key bindings or /cll commands. Nothing here runs unless "Enable keyboard rolls"
--- is ticked in the options.
+-- Controller mode (opt-in; "keyboard rolls" inside): select a visible roll, inspect it,
+-- answer Need / Greed / Pass with key or gamepad bindings, or /cll commands. Nothing here
+-- runs unless "Enable controller mode" is ticked in the options.
 
 local _, CL = ...
 
@@ -77,7 +77,7 @@ end
 local hoveredFrame, hoveredID
 
 local function InspectionFrame()
-    if CL.db.keyboardInspectHover then return hoveredFrame end
+    if not CL.db.keyboardInspectSticky then return hoveredFrame end
     return selectedFrame
 end
 
@@ -99,7 +99,7 @@ local function ShowInspection()
         local r, g, b = CL.QualityColor(target.quality)
         inspection:SetText(name or "Item details unavailable", r, g, b)
     else
-        local pawnUpdate = CL.db.keyboardPawn ~= false and rawget(_G, "PawnUpdateTooltip")
+        local pawnUpdate = CL.db.keyboardPawn and rawget(_G, "PawnUpdateTooltip")
         if type(pawnUpdate) == "function" then
             local ok, err = pcall(pawnUpdate, inspection:GetName(), "SetHyperlink", link)
             if not ok then CL.Debug("Pawn inspection update failed: %s", tostring(err)) end
@@ -246,7 +246,7 @@ function K.OnChanged()
     if selectedID and CL.RollFrames.GetFrame(selectedID) == selectedFrame then
         K.RefreshBindings()
         ShowInspection()
-    elseif CL.db.keyboardInspect and not CL.db.keyboardInspectHover then
+    elseif CL.db.keyboardInspect and CL.db.keyboardInspectSticky then
         Select(First())   -- the inspection follows the selection: there is always one
     else
         Select(nil)
@@ -281,7 +281,7 @@ end
 -- The inspection tooltip on or off (an option; also the Inspect binding).
 function K.SetInspect(enabled)
     CL.db.keyboardInspect = enabled and true or false
-    if CL.db.keyboardInspect and CL.db.keyboardEnabled and not selectedID and not CL.db.keyboardInspectHover then
+    if CL.db.keyboardInspect and CL.db.keyboardEnabled and not selectedID and CL.db.keyboardInspectSticky then
         Select(First())
     else
         ShowInspection()
@@ -289,12 +289,12 @@ function K.SetInspect(enabled)
     K.Layout()
 end
 
--- The mouse rolling over a roll shows its inspection, and leaving hides it; or, with this
--- off, the inspection follows the selected roll and stays up (keys only, no mouse).
-function K.SetInspectHover(enabled)
-    CL.db.keyboardInspectHover = enabled and true or false
+-- By default the mouse rolling over a roll shows its inspection and leaving hides it; with
+-- "sticky" on, the inspection follows the selected roll and stays up (no mouse needed).
+function K.SetInspectSticky(enabled)
+    CL.db.keyboardInspectSticky = enabled and true or false
     hoveredFrame, hoveredID = nil, nil
-    if CL.db.keyboardInspect and CL.db.keyboardEnabled and not CL.db.keyboardInspectHover and not selectedID then
+    if CL.db.keyboardInspect and CL.db.keyboardEnabled and CL.db.keyboardInspectSticky and not selectedID then
         Select(First())
     else
         ShowInspection()
@@ -309,7 +309,7 @@ end
 
 -- Which roll the mouse is over, looked at a few times a second while it matters.
 function K.UpdateHover()
-    if not (CL.db and CL.db.keyboardEnabled and CL.db.keyboardInspect and CL.db.keyboardInspectHover) then
+    if not (CL.db and CL.db.keyboardEnabled and CL.db.keyboardInspect and not CL.db.keyboardInspectSticky) then
         if hoveredFrame then
             hoveredFrame, hoveredID = nil, nil
             ShowInspection()
@@ -364,7 +364,7 @@ end
 
 function K.Action(action)
     if not CL.db.keyboardEnabled then
-        CL.Print("Enable keyboard rolls in CleanLoot options first.")
+        CL.Print("Enable controller mode in CleanLoot options first.")
         return
     end
     if action == "inspect" then

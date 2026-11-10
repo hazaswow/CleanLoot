@@ -102,6 +102,7 @@ local function KeyField(parent, action, x, y, width)
     local function Stop()
         capturing = false
         btn:EnableKeyboard(false)
+        btn:EnableGamePadButton(false)
         Show()
     end
 
@@ -113,28 +114,32 @@ local function KeyField(parent, action, x, y, width)
         end
         capturing = true
         btn:EnableKeyboard(true)
+        btn:EnableGamePadButton(true)   -- a controller button counts as a key
         if btn.SetPropagateKeyboardInput then btn:SetPropagateKeyboardInput(false) end
         Show()
     end)
-    btn:SetScript("OnKeyDown", function(_, key)
+    local function OnKey(_, key)
         if K.IsModifier(key) then return end
         if key ~= "ESCAPE" then K.Bind(K.Combo(key), action) end
         Stop()
-    end)
+    end
+    btn:SetScript("OnKeyDown", OnKey)
+    btn:SetScript("OnGamePadButtonDown", OnKey)
     btn:SetScript("OnHide", function() if capturing then Stop() end end)
     btn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine("Click, then press a key", 1, 1, 1)
+        GameTooltip:AddLine("Click, then press a key or a controller button", 1, 1, 1)
         GameTooltip:AddLine("Right-click clears it.", 0.7, 0.7, 0.7)
         GameTooltip:Show()
     end)
     btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     btn:EnableKeyboard(false)
+    btn:EnableGamePadButton(false)
     btn.Sync = function() if capturing then Stop() else Show() end end
     return btn
 end
 
--- A checkbox that only means something while keyboard rolls are on: greyed out otherwise.
+-- A checkbox that only means something while controller mode is on: greyed out otherwise.
 local function DependsOnKeyboard(cb)
     local sync = cb.Sync
     cb.Sync = function()
@@ -232,8 +237,9 @@ local function Build()
     widgets.resultsMove = PushButton(panel, "Move", 334, -388, 80, function() CL.Results.ToggleSample() end)
     widgets.resultsReset = PushButton(panel, "Reset", 420, -388, 80, function() CL.Results.ResetPosition() end)
 
-    -- the keys of the keyboard rolls, set here instead of hunting for them in Key Bindings
+    -- the keys of controller mode, set here instead of hunting for them in Key Bindings
     Text(panel, "Key bindings", 330, -424, "GameFontNormalLarge")
+    Text(panel, "keys and gamepad buttons", 440, -429, "GameFontDisableSmall")
     for i, entry in ipairs(CL.Keyboard.ACTIONS) do
         local col, row = (i - 1) % 2, math.floor((i - 1) / 2)
         local x, y = 330 + col * 150, -450 - row * 26
@@ -251,16 +257,16 @@ local function Build()
         function() return CL.db.minimap and CL.db.minimap.hide end,
         function(v) CL.MinimapButton.SetHidden(v) end)
 
-    Text(panel, "Keyboard rolls", 16, -430, "GameFontNormalLarge")
-    widgets.keyboard = Checkbox(panel, "Enable keyboard rolls", 16, -456,
+    Text(panel, "Controller mode", 16, -430, "GameFontNormalLarge")
+    widgets.keyboard = Checkbox(panel, "Enable controller mode (keyboard / gamepad rolls)", 16, -456,
         function() return CL.db.keyboardEnabled end,
         function(v) CL.Keyboard.SetEnabled(v) end)
     widgets.inspect = DependsOnKeyboard(Checkbox(panel, "Show an item inspection tooltip", 16, -480,
         function() return CL.db.keyboardInspect end,
         function(v) CL.Keyboard.SetInspect(v) end))
-    widgets.inspectHover = DependsOnKeyboard(Checkbox(panel, "Only while hovering a roll", 16, -504,
-        function() return CL.db.keyboardInspectHover end,
-        function(v) CL.Keyboard.SetInspectHover(v) end))
+    widgets.inspectSticky = DependsOnKeyboard(Checkbox(panel, "Keep it on the selected roll (no mouse)", 16, -504,
+        function() return CL.db.keyboardInspectSticky end,
+        function(v) CL.Keyboard.SetInspectSticky(v) end))
     widgets.pawn = DependsOnKeyboard(Checkbox(panel, "Include Pawn upgrade info", 16, -528,
         function() return CL.db.keyboardPawn end,
         function(v) CL.Keyboard.SetPawn(v) end))
@@ -269,13 +275,9 @@ local function Build()
         pawnSync()
         if not rawget(_G, "PawnUpdateTooltip") then widgets.pawn:Disable() end  -- nothing to include without Pawn
     end
-    Text(panel, "Inspection side", 16, -560)
-    widgets.inspectRight = DependsOnKeyboard(Checkbox(panel, "Right", 128, -556,
-        function() return CL.db.keyboardInspectSide ~= "LEFT" end,
-        function() CL.Keyboard.SetSide("RIGHT") end))
-    widgets.inspectLeft = DependsOnKeyboard(Checkbox(panel, "Left", 230, -556,
+    widgets.inspectLeft = DependsOnKeyboard(Checkbox(panel, "Show it on the left side", 16, -552,
         function() return CL.db.keyboardInspectSide == "LEFT" end,
-        function() CL.Keyboard.SetSide("LEFT") end))
+        function(v) CL.Keyboard.SetSide(v and "LEFT" or "RIGHT") end))
 
     -- values may have changed through a slash command since the panel was built
     panel:SetScript("OnShow", Options.Refresh)
