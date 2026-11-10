@@ -556,7 +556,8 @@ WOW.Advance(0.2)
 local answered = {}
 for id = 900001, 901000 do if RF.GetFrame(id) then answered[#answered + 1] = id end end
 check(#answered == 3 and R.WaitingShown(), "three simulated drops: the card is up")
-for _, id in ipairs(answered) do clickButton(RF.GetFrame(id), CL.ROLL.NEED) end
+-- Greed: the simulator makes Need unavailable on a quarter of its rolls, at random
+for _, id in ipairs(answered) do clickButton(RF.GetFrame(id), CL.ROLL.GREED) end
 WOW.Advance(0.2)
 check(RF.ActiveCount() == 0 and R.WaitingShown(), "answered by a click: no frame is left but the others are still waited for")
 WOW.Advance(4)
