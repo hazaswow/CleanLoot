@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.3.1
+
+**Options**
+- A discreet corner at the bottom of the main options page: I stream WoW on Twitch, and there is a Ko-fi if you want to help me pay my Claude subscription. Each button shows its address in a box to copy. Nothing else in the game changed.
+
 ## 1.3.0
 
 **Controller mode** (new, off by default; contributed by chuwix)
