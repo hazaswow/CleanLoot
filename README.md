@@ -60,4 +60,4 @@ Run `/cll debug on`, reproduce the issue, and share the chat lines with your cli
 
 ## Author
 
-**Hazas**
+I'm Hazas. I stream WoW on [Twitch](https://www.twitch.tv/hazaswow), come say hi. If CleanLoot saves you some clicks and you'd like to help me pay my Claude subscription, there's a [Ko-fi](https://ko-fi.com/hazas).

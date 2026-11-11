@@ -86,6 +86,56 @@ local function PushButton(parent, label, x, y, width, onClick)
     return b
 end
 
+-- Where to find the author. WoW cannot open a browser, so a click on one of these
+-- shows the address in a box to copy (Ctrl+C).
+local LINKS = {
+    { label = "Twitch", url = "https://www.twitch.tv/hazaswow",
+      text = "I stream WoW, come say hi:", textX = 16, buttonX = 168 },
+    { label = "Ko-fi", url = "https://ko-fi.com/hazas",
+      text = "Help me pay my Claude subscription:", textX = 256, buttonX = 462 },
+}
+
+local linkFrame
+local function ShowLink(link)
+    if not linkFrame then
+        local f = CreateFrame("Frame", "CleanLootLinkFrame", UIParent)
+        f:SetSize(340, 96)
+        f:SetPoint("CENTER", UIParent, "CENTER", 0, 80)
+        f:SetFrameStrata("FULLSCREEN_DIALOG")
+        f:EnableMouse(true)
+        local bg = f:CreateTexture(nil, "BACKGROUND")
+        bg:SetAllPoints()
+        bg:SetColorTexture(0.05, 0.05, 0.05, 0.95)
+        f.title = Text(f, "", 14, -12, "GameFontNormal")
+        Text(f, "Ctrl+C to copy, then Esc to close.", 14, -68, "GameFontDisableSmall")
+
+        local box = CreateFrame("EditBox", nil, f)
+        box:SetSize(312, 22)
+        box:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -36)
+        box:SetFontObject("ChatFontNormal")
+        box:SetAutoFocus(false)
+        box:SetTextInsets(4, 4, 0, 0)
+        local boxBg = box:CreateTexture(nil, "BACKGROUND")
+        boxBg:SetAllPoints()
+        boxBg:SetColorTexture(0.15, 0.15, 0.15, 1)
+        box:SetScript("OnEscapePressed", function() f:Hide() end)
+        box:SetScript("OnEnterPressed", function() f:Hide() end)
+        box:SetScript("OnEditFocusGained", function(self) self:HighlightText() end)
+        box:SetScript("OnTextChanged", function(self, user)   -- read-only: put the address back
+            if user and f.url then self:SetText(f.url) self:HighlightText() end
+        end)
+        f.box = box
+        f:SetScript("OnHide", function() box:ClearFocus() end)
+        linkFrame = f
+    end
+    linkFrame.url = link.url
+    linkFrame.title:SetText(link.label)
+    linkFrame.box:SetText(link.url)
+    linkFrame:Show()
+    linkFrame.box:SetFocus()
+    linkFrame.box:HighlightText()
+end
+
 -- A key field for a binding: click, press a key (modifiers count), Esc cancels,
 -- right-click clears. The same binding as the one in the game's Key Bindings page.
 local function KeyField(parent, action, x, y, width)
@@ -254,6 +304,12 @@ local function Build()
     widgets.sim = PushButton(panel, "Simulate 3 drops", 334, -478, 120, function() CL.Sim.Start(3) end)
     widgets.simColors = PushButton(panel, "Each colour", 458, -478, 100, function() CL.Sim.Colors() end)
     widgets.simClear = PushButton(panel, "Clear", 562, -478, 64, function() CL.Sim.Clear() end)
+
+    -- a discreet corner: who makes this, and where to find them
+    for i, link in ipairs(LINKS) do
+        Text(panel, link.text, link.textX, -566, "GameFontDisableSmall")
+        widgets["link" .. i] = PushButton(panel, link.label, link.buttonX, -561, 70, function() ShowLink(link) end)
+    end
 
     -- values may have changed through a slash command since the panel was built
     panel:SetScript("OnShow", Options.Refresh)

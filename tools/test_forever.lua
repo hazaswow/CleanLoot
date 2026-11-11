@@ -1179,5 +1179,17 @@ for _, e in ipairs(R.Waiting()) do if e.key == 7001 then still = true end end
 check(not still and not R.WaitingShown(), "a decided roll is no longer waited for")
 R.Clear()
 
+-- 34. The author's corner of the options: Twitch and Ko-fi, copied from a box (no browser in WoW)
+local OW = CL.Options.widgets
+check(OW.link1 and OW.link2, "the options page has a Twitch and a Ko-fi button")
+OW.link1:GetScript("OnClick")()
+local linkBox = _G.CleanLootLinkFrame
+check(linkBox and linkBox:IsShown() and linkBox.url == "https://www.twitch.tv/hazaswow",
+    "Twitch opens the box with the channel address")
+OW.link2:GetScript("OnClick")()
+check(linkBox.url == "https://ko-fi.com/hazas" and linkBox:IsShown(), "Ko-fi shows its own address in the same box")
+linkBox.box:GetScript("OnEscapePressed")()
+check(not linkBox:IsShown(), "Esc closes the box")
+
 io.write(("%d checks, %d failed\n"):format(checks, failures))
 os.exit(failures == 0 and 0 or 1)
