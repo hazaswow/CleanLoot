@@ -31,8 +31,9 @@ SlashCmdList.CLEANLOOT("need")
 check(K.SelectedID() == nil and #rolls == 0 and not a.selection:IsShown(), "disabled commands do not select or roll")
 check(not a.buttons[CL.ROLL.NEED].binding:IsShown(), "bindings are hidden when keyboard rolls are disabled")
 local W = CL.Options.widgets
-check(WOW.subcategory and WOW.subcategory.parent == WOW.category and WOW.subcategory.name == "Controller mode"
-    and WOW.subcategory.panel == CL.Options.controllerPanel and CL.Options.controllerPanel ~= CL.Options.panel,
+local controllerPage = WOW.subcategories and WOW.subcategories["Controller mode"]
+check(controllerPage and controllerPage.parent == WOW.category and controllerPage.name == "Controller mode"
+    and controllerPage.panel == CL.Options.controllerPanel and CL.Options.controllerPanel ~= CL.Options.panel,
     "controller mode has its own page, listed under CleanLoot")
 check(W.keyboard:GetParent() == CL.Options.controllerPanel and W.inspect:GetParent() == CL.Options.controllerPanel
     and W.pawn:GetParent() == CL.Options.controllerPanel and W.key1:GetParent() == CL.Options.controllerPanel

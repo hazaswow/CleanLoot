@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.4.0
+
+**Auto-roll** (new; nothing is automatic until you make a rule)
+- Always Need, Greed or Pass on an item: right-click the button on its roll frame (it turns green; right-click it again to forget the rule), or add it on the new *Auto-roll* page of the options, or with `/cll auto need|greed|pass [item]`.
+- Optionally one answer for every green, blue, epic or legendary item. An item rule wins over them.
+- It only answers when the answer is possible: a greyed-out button, or a bind-on-pickup Need/Greed while the game's confirmation is yours, leaves the roll to you. With *Auto-accept bind-on-pickup prompts* ticked, those go out too. Pass always goes out. A chat line says what was answered, or why not.
+- Rolls it answers show no frame; the winner popup still reports the result.
+
+**Options**
+- The link box of the author's corner closes by itself once you copy the link with Ctrl+C.
+
 ## 1.3.1
 
 **Options**

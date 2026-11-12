@@ -259,8 +259,12 @@ Settings = {
     RegisterAddOnCategory = function(c) WOW.registeredCategory = c end,
     OpenToCategory = function(id) WOW.openedCategory = id end,
     RegisterCanvasLayoutSubcategory = function(parent, panel, name)
-        local c = { ID = 100, name = name, panel = panel, parent = parent, GetID = function() return 100 end }
-        WOW.subcategory = c
+        WOW.subcategories = WOW.subcategories or {}
+        local id = 100 + (WOW.subcategoryCount or 0)
+        WOW.subcategoryCount = (WOW.subcategoryCount or 0) + 1
+        local c = { ID = id, name = name, panel = panel, parent = parent, GetID = function() return id end }
+        WOW.subcategories[name] = c
+        WOW.subcategory = c  -- the last one registered
         return c
     end,
 }

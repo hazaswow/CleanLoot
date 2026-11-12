@@ -28,6 +28,8 @@ local DEFAULTS = {
     showResults = true,  -- a small popup with who won each roll, and with what
     autoConfirm = false,  -- accept the game's bind-on-pickup prompt for you (off: the prompt is yours to answer)
     showWaiting = true,  -- the "waiting on rolls" card at the start of the winner popup
+    autoRollEnabled = true,  -- master switch of the auto-roll rules (none exist until you make one)
+    autoRollSay = true,  -- a chat line when a rule answers for you, or could not
     keyboardEnabled = false,
     keyboardInspect = false,
     keyboardInspectSticky = false,  -- the inspection tooltip stays on the selected roll (off: only while the mouse is over a roll)
@@ -387,7 +389,13 @@ function CL.OnStartLootRoll(rollID, rollTime, lootKey, startedAt, attempt)
     API.TrackRoll(rollID, lootKey)
     -- this item will be in the winner popup: its "You won" toast is redundant
     if CL.Results then CL.Results.Cover(info.name, 300) end
-    CL.RollFrames.Start(rollID, info, API.GetRollLink(rollID), remaining)
+    local link = API.GetRollLink(rollID)
+    -- an auto-roll rule answers for you: no frame to show (the result still goes to the popup)
+    if CL.AutoRoll and CL.AutoRoll.Try(rollID, info, link) then
+        if CL.Results then CL.Results.RefreshWaiting() end
+        return
+    end
+    CL.RollFrames.Start(rollID, info, link, remaining)
 end
 
 function CL.OnRollGone(rollID)

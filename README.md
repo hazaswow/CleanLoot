@@ -15,6 +15,7 @@ Clean loot roll frames for **WoW Forever** (the official Blizzard beta client). 
 - **Big drops**: more rolls than frames? The rest wait in a queue and appear as you answer, with their timers still running. No roll is lost
 - **After a `/reload`**, rolls still running are brought back
 - **Controller mode** (off by default, made for gamepads and keyboards): select a visible roll and answer Need / Greed / Pass with bindings on keys or controller buttons (set from the options) or slash commands, with an optional inspection tooltip
+- **Auto-roll** (nothing is automatic until you make a rule): always Need, Greed or Pass on an item you choose (right-click the button on its roll frame, or add it on the *Auto-roll* page), and optionally one answer for every green, blue, epic or legendary item. A rule only answers when the answer is possible; otherwise the roll stays yours
 - **Blizzard's own roll frames are hidden** (and stop catching clicks). the options bring them back
 - **Less chat spam**: the per-roll lines (who selected what, roll values) are filtered out; **who won what** and your loot stay visible. Blizzard's *Loot Rolls* history window keeps everything
 - **Winner popup**: when a roll ends, a small card shows who won and with which roll, and always your own roll (rolled, passed or did not answer). Hover it for every roll of the drop; right-click closes it. It stacks downwards or upwards, as you choose. A small **Waiting on rolls** card opens the stack while a roll is still open; hover it for each item with how many players have not rolled, then their names (you included while you have not answered; an option turns it off). It stands in for the roll lines the chat filter hides
@@ -33,6 +34,9 @@ Clean loot roll frames for **WoW Forever** (the official Blizzard beta client). 
 |---|---|
 | `/cll` | Open the options panel |
 | `/cll controller` | Open the controller mode page of the options |
+| `/cll auto` | Open the auto-roll page of the options |
+| `/cll auto need` / `greed` / `pass` `[item]` | Always roll that way on an item (shift-click it into the chat line, or give its id) |
+| `/cll auto remove [item]` / `/cll auto list` | Forget an item's rule / list the rules |
 | `/cll restore` | Bring back rolls still running (automatic at login and `/reload`) |
 | `/cll next` / `/cll previous` | Select the next or previous visible roll |
 | `/cll inspect` | Toggle the separate inspection tooltip |
@@ -45,6 +49,7 @@ Clean loot roll frames for **WoW Forever** (the official Blizzard beta client). 
 
 ## Notes
 
+- Auto-roll: *CleanLoot → Auto-roll*. Right-click **Need**, **Greed** or **Pass** on a roll frame to always answer that way for that item; the button turns green, and right-clicking it again forgets the rule. An item rule wins over the quality rules (green to legendary; rolls start at green). A rule never answers when that button is greyed out for you, and a bind-on-pickup Need or Greed only goes out if *Auto-accept bind-on-pickup prompts* is ticked (otherwise the game's confirmation is yours, so the frame opens as usual). Pass always goes out. A chat line tells you what was answered, or why not (switch it off in the page).
 - To use controller mode, enable **Controller mode** on its own page of the options (*CleanLoot → Controller mode*, or `/cll controller`), then set the keys right there (*Key bindings*: click a field, press a key or a controller button, right-click clears), or in the game's Key Bindings page under *CleanLoot*, or put the `/cll` commands in macros or OPie slices. No keys are assigned automatically. The inspection tooltip is an option too (*Show an item inspection tooltip*, off by default), with its side (*Show it on the left side*). It shows only while the mouse is over a roll; tick *Keep it on the selected roll (no mouse)* to keep it up on the selected roll instead, for a gamepad. The Inspect key toggles the same option. Every controller-mode option is off by default.
 - Selection cycles through visible rolls in arrival order, not the waiting queue. A roll command with no selection selects the oldest visible item without rolling; press a roll command again to choose. If the inspection is kept on the selected roll, new rolls are selected automatically. Once an item is selected, a roll command acts immediately; the selection moves on when the roll closes.
 - Available roll buttons on the selected item show their first assigned CleanLoot key binding. Keys assigned only to a macro or OPie ring are not shown.

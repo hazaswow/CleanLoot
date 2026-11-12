@@ -3,6 +3,9 @@ local _, CL = ...
 local HELP = {
     "/cll               open the options panel",
     "/cll controller    open the controller mode page of the options",
+    "/cll auto          open the auto-roll page of the options",
+    "/cll auto need|greed|pass [item]  always roll that way on an item (shift-click it)",
+    "/cll auto remove [item] | list    forget an item's rule | list the rules",
     "/cll sim [n]       simulate n loot rolls (1-8) with a fake group",
     "/cll sim colors    one simulated drop of every colour",
     "/cll sim group <n> other players in the simulated group (1-39, default 4)",
@@ -24,6 +27,9 @@ SlashCmdList["CLEANLOOT"] = function(msg)
         CL.Options.Open()
     elseif cmd == "controller" then
         CL.Options.OpenController()
+    elseif cmd == "auto" then
+        -- the argument keeps its case: an item link must not be lowercased
+        CL.AutoRoll.Command((msg or ""):match("^%s*%S+%s*(.-)%s*$"))
     elseif cmd == "sim" then
         local sub, arg = rest:match("^(%S*)%s*(.-)$")
         if sub == "clear" then

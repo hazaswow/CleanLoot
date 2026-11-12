@@ -89,7 +89,7 @@ local function ShowButtonTooltip(btn, f)
         reasonText = reason and _G["LOOT_ROLL_INELIGIBLE_REASON" .. tostring(reason)]
         reasonText = reasonText or ("You can't roll %s on this item."):format(CL.ROLL_NAME[btn.rollType])
     end
-    if n == 0 and not reasonText then return end
+    if n == 0 and not reasonText and not btn.auto then return end
 
     GameTooltip:SetOwner(btn, "ANCHOR_TOP")
     if n > 0 then
@@ -97,6 +97,10 @@ local function ShowButtonTooltip(btn, f)
         AddPlayerLines(list)
     end
     if reasonText then GameTooltip:AddLine(reasonText, 1, 0.2, 0.2, true) end
+    if btn.auto then
+        GameTooltip:AddLine(("Auto: always %s on this item. Right-click removes it."):format(CL.ROLL_NAME[btn.rollType]),
+            0.3, 1, 0.3, true)
+    end
     GameTooltip:Show()
 end
 
@@ -162,17 +166,25 @@ local function CreateRollButton(f, rollType)
     count:SetText("")
     b.count = count
 
-    b:RegisterForClicks("LeftButtonUp")
+    b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     -- Snapshot the target roll on mouse-DOWN: between down and up the roll can
     -- end by itself and this pooled frame be handed to a new item, which would
     -- then receive the click: a vote on the wrong item.
     b:SetScript("OnMouseDown", function(self)
         self.clickRollID, self.clickBop = f.rollID, f.bop
+        self.clickLink, self.clickName = f.link, f.itemName
     end)
-    b:SetScript("OnClick", function(self)
-        local id, bop = self.clickRollID, self.clickBop
+    b:SetScript("OnClick", function(self, button)
+        local id, bop, link, name = self.clickRollID, self.clickBop, self.clickLink, self.clickName
         if not id or self.unavailable then return end
-        self.clickRollID, self.clickBop = nil, nil
+        self.clickRollID, self.clickBop, self.clickLink, self.clickName = nil, nil, nil, nil
+        if button == "RightButton" then
+            -- "always this answer for this item": remember it (or forget it), and answer now
+            if CL.AutoRoll.ToggleForItem(link, name, self.rollType) == "added" then
+                RF.Answer(id, self.rollType, bop)
+            end
+            return
+        end
         RF.Answer(id, self.rollType, bop)
     end)
     b:SetScript("OnEnter", function(self)
@@ -383,6 +395,27 @@ function RF.Layout()
     if CL.Keyboard then CL.Keyboard.Layout() end
 end
 
+-- The button an auto-roll rule answers with is green (and says so in its tooltip).
+local function ApplyAuto(f)
+    local AR = CL.AutoRoll
+    local rule = AR and f.rollID and AR.ItemRule(AR.ItemID(f.link))
+    for rollType, b in pairs(f.buttons) do
+        b.auto = (rule and rule.roll == rollType) or false
+        if b.unavailable then
+            b.label:SetTextColor(0.4, 0.4, 0.4)
+        elseif b.auto then
+            b.label:SetTextColor(0.3, 1, 0.3)
+        else
+            b.label:SetTextColor(1, 0.82, 0)
+        end
+    end
+end
+
+-- A rule was added or removed: the open frames show it.
+function RF.RefreshAuto()
+    for _, f in ipairs(active) do ApplyAuto(f) end
+end
+
 -------------------------------------------------
 -- Public API
 -------------------------------------------------
@@ -416,6 +449,7 @@ local function Open(f, rollID, info, link, endTime, duration)
     SetButtonAvailable(f.buttons[CL.ROLL.NEED], info.canNeed)
     SetButtonAvailable(f.buttons[CL.ROLL.GREED], info.canGreed)
     SetButtonAvailable(f.buttons[CL.ROLL.PASS], true)
+    ApplyAuto(f)
 
     f.duration = duration
     f.endTime = endTime

@@ -107,7 +107,7 @@ local function ShowLink(link)
         bg:SetAllPoints()
         bg:SetColorTexture(0.05, 0.05, 0.05, 0.95)
         f.title = Text(f, "", 14, -12, "GameFontNormal")
-        Text(f, "Ctrl+C to copy, then Esc to close.", 14, -68, "GameFontDisableSmall")
+        Text(f, "Press Ctrl+C: it copies the link and closes this box.", 14, -68, "GameFontDisableSmall")
 
         local box = CreateFrame("EditBox", nil, f)
         box:SetSize(312, 22)
@@ -121,6 +121,13 @@ local function ShowLink(link)
         box:SetScript("OnEscapePressed", function() f:Hide() end)
         box:SetScript("OnEnterPressed", function() f:Hide() end)
         box:SetScript("OnEditFocusGained", function(self) self:HighlightText() end)
+        -- Ctrl+C (Cmd+C on a Mac) copies the selected address: close once the copy is done
+        box:SetScript("OnKeyDown", function(_, key)
+            if key ~= "C" then return end
+            if (IsControlKeyDown and IsControlKeyDown()) or (IsMetaKeyDown and IsMetaKeyDown()) then
+                C_Timer.After(0.15, function() if f:IsShown() then f:Hide() end end)
+            end
+        end)
         box:SetScript("OnTextChanged", function(self, user)   -- read-only: put the address back
             if user and f.url then self:SetText(f.url) self:HighlightText() end
         end)
@@ -254,11 +261,13 @@ local function Build()
         function() return CL.db.minimap and CL.db.minimap.hide end,
         function(v) CL.MinimapButton.SetHidden(v) end)
 
-    -- everything about controller mode is on its own page, under this one
-    Text(panel, "Controller mode", 16, -430, "GameFontNormalLarge")
-    Text(panel, "Play the rolls with a gamepad or the keyboard.", 16, -456, "GameFontDisableSmall")
-    widgets.controllerOpen = PushButton(panel, "Controller mode options", 20, -478, 190, function()
+    -- controller mode and auto-roll each have a page of their own, under this one
+    Text(panel, "More options", 16, -430, "GameFontNormalLarge")
+    widgets.controllerOpen = PushButton(panel, "Controller mode options", 20, -458, 190, function()
         Options.OpenController()
+    end)
+    widgets.autoRollOpen = PushButton(panel, "Auto-roll options", 20, -488, 190, function()
+        Options.OpenAutoRoll()
     end)
 
     -- second column, beside the short rows of the first
@@ -366,6 +375,155 @@ local function BuildController()
     return panel
 end
 
+-- A one-line text box with a plain dark background (no Blizzard template).
+local function TextBox(parent, x, y, width)
+    local box = CreateFrame("EditBox", nil, parent)
+    box:SetSize(width, 22)
+    box:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
+    box:SetFontObject("ChatFontNormal")
+    box:SetAutoFocus(false)
+    box:SetTextInsets(4, 4, 0, 0)
+    local bg = box:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints()
+    bg:SetColorTexture(0.15, 0.15, 0.15, 1)
+    box:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+    box:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
+    return box
+end
+
+local AUTO_ROWS = 10  -- item rules shown at once; the mouse wheel scrolls the rest
+
+-- The page of auto-roll: the switch, a rule per quality, and the item rules.
+local function BuildAutoRoll()
+    local AR = CL.AutoRoll
+    local panel = CreateFrame("Frame")
+    panel.name = "Auto-roll"
+    Options.autoRollPanel = panel
+
+    Text(panel, "Auto-roll", 16, -16, "GameFontNormalLarge")
+    Text(panel, "Answer a roll for you. If an answer is not possible, the roll stays yours.", 16, -44, "GameFontDisableSmall")
+    widgets.autoOn = Checkbox(panel, "Enable auto-roll", 16, -72,
+        function() return CL.db.autoRollEnabled end,
+        function(v) CL.db.autoRollEnabled = v end)
+    widgets.autoSay = Checkbox(panel, "Tell me in the chat when it answers", 16, -96,
+        function() return CL.db.autoRollSay end,
+        function(v) CL.db.autoRollSay = v end)
+
+    -- by quality: rolls start at green, so there is no white or grey row
+    Text(panel, "By quality", 16, -140, "GameFontNormalLarge")
+    Text(panel, "An item rule (right) wins over these.", 16, -166, "GameFontDisableSmall")
+    local choices = { { "Off", nil }, { "Need", CL.ROLL.NEED }, { "Greed", CL.ROLL.GREED }, { "Pass", CL.ROLL.PASS } }
+    local xs = { 86, 138, 196, 254 }
+    for i, quality in ipairs(AR.QUALITIES) do
+        local y = -190 - (i - 1) * 30
+        local label = Text(panel, AR.QualityName(quality), 16, y - 6, "GameFontHighlightSmall")
+        local r, g, b = CL.QualityColor(quality)
+        label:SetTextColor(r, g, b)
+        for k, choice in ipairs(choices) do
+            local rollType = choice[2]
+            widgets["autoQ" .. quality .. "_" .. k] = Checkbox(panel, choice[1], xs[k], y,
+                function() return AR.QualityRule(quality) == rollType end,
+                function() AR.SetQuality(quality, rollType) end)
+        end
+    end
+    Text(panel, "Bind-on-pickup items only roll for you when", 16, -330, "GameFontDisableSmall")
+    Text(panel, "\"Auto-accept bind-on-pickup prompts\" is ticked.", 16, -346, "GameFontDisableSmall")
+    Text(panel, "The same rules work as commands:", 16, -388, "GameFontDisableSmall")
+    Text(panel, "/cll auto need|greed|pass [item]", 16, -406, "GameFontDisableSmall")
+    Text(panel, "/cll auto remove [item]   /cll auto list", 16, -424, "GameFontDisableSmall")
+
+    -- item rules, second column
+    Text(panel, "Item rules", 330, -56, "GameFontNormalLarge")
+    Text(panel, "Right-click Need, Greed or Pass on a roll to add one,", 330, -84, "GameFontDisableSmall")
+    Text(panel, "or paste an item link (or its id) here and pick the answer:", 330, -100, "GameFontDisableSmall")
+    local box = TextBox(panel, 334, -122, 290)
+    widgets.autoBox = box
+    if rawget(_G, "hooksecurefunc") and rawget(_G, "ChatEdit_InsertLink") then
+        -- a shift-click on an item goes into this box while it has the focus
+        hooksecurefunc("ChatEdit_InsertLink", function(text)
+            if text and box:HasFocus() then box:Insert(text) end
+        end)
+    end
+    local function Add(rollType)
+        local text = box:GetText()
+        local id = AR.ItemID(text)
+        if not id then
+            CL.Print("paste an item link, or type an item id.")
+            return
+        end
+        AR.SetItem(id, rollType, AR.NameOf(id, text))
+        box:SetText("")
+        box:ClearFocus()
+    end
+    widgets.autoAddNeed = PushButton(panel, "Add Need", 334, -150, 86, function() Add(CL.ROLL.NEED) end)
+    widgets.autoAddGreed = PushButton(panel, "Add Greed", 424, -150, 86, function() Add(CL.ROLL.GREED) end)
+    widgets.autoAddPass = PushButton(panel, "Add Pass", 514, -150, 86, function() Add(CL.ROLL.PASS) end)
+
+    local list = CreateFrame("Frame", nil, panel)
+    list:SetPoint("TOPLEFT", panel, "TOPLEFT", 330, -190)
+    list:SetSize(300, AUTO_ROWS * 26)
+    list:EnableMouseWheel(true)
+    local offset = 0
+    local rows = {}
+    for i = 1, AUTO_ROWS do
+        local y = -(i - 1) * 26
+        local row = {}
+        row.name = Text(list, "", 4, y - 5, "GameFontHighlightSmall")
+        row.name:SetWidth(170)
+        row.name:SetWordWrap(false)
+        row.roll = PushButton(list, "", 178, y, 60, function()
+            if row.id then AR.SetItem(row.id, AR.NextRoll(row.rule), row.itemName) end
+        end)
+        row.remove = PushButton(list, "X", 242, y, 28, function()
+            if row.id then AR.RemoveItem(row.id) end
+        end)
+        rows[i] = row
+    end
+    local count = Text(panel, "", 330, -190 - AUTO_ROWS * 26 - 6, "GameFontDisableSmall")
+    list.Sync = function()
+        local rules = AR.List()
+        local maxOffset = math.max(0, #rules - AUTO_ROWS)
+        if offset > maxOffset then offset = maxOffset end
+        for i, row in ipairs(rows) do
+            local rule = rules[i + offset]
+            if rule then
+                row.id, row.rule, row.itemName = rule.id, rule.roll, rule.name
+                row.name:SetText(rule.name)
+                row.roll:SetText(CL.ROLL_NAME[rule.roll])
+                row.name:Show() row.roll:Show() row.remove:Show()
+            else
+                row.id = nil
+                row.name:SetText("")
+                row.name:Hide() row.roll:Hide() row.remove:Hide()
+            end
+        end
+        if #rules == 0 then
+            count:SetText("No item rule yet.")
+        elseif #rules > AUTO_ROWS then
+            count:SetText(("%d rules, scroll for more. Click an answer to change it."):format(#rules))
+        else
+            count:SetText(("%d rule%s. Click an answer to change it."):format(#rules, #rules == 1 and "" or "s"))
+        end
+    end
+    list:SetScript("OnMouseWheel", function(_, delta)
+        offset = math.max(0, offset - delta)
+        list.Sync()
+    end)
+    widgets.autoList = list
+
+    panel:SetScript("OnShow", Options.Refresh)
+    return panel
+end
+
+local function RegisterPage(parentCategory, page)
+    if Settings.RegisterCanvasLayoutSubcategory then
+        return Settings.RegisterCanvasLayoutSubcategory(parentCategory, page, page.name)
+    end
+    local category = Settings.RegisterCanvasLayoutCategory(page, "CleanLoot: " .. page.name)
+    Settings.RegisterAddOnCategory(category)
+    return category
+end
+
 function Options.Setup()
     if not (Settings and Settings.RegisterCanvasLayoutCategory and Settings.RegisterAddOnCategory) then return end
     local panel = Build()
@@ -373,14 +531,9 @@ function Options.Setup()
     Settings.RegisterAddOnCategory(category)
     Options.category = category
 
-    -- controller mode gets a page of its own, listed under CleanLoot
-    local controller = BuildController()
-    if Settings.RegisterCanvasLayoutSubcategory then
-        Options.controllerCategory = Settings.RegisterCanvasLayoutSubcategory(category, controller, controller.name)
-    else
-        Options.controllerCategory = Settings.RegisterCanvasLayoutCategory(controller, "CleanLoot: " .. controller.name)
-        Settings.RegisterAddOnCategory(Options.controllerCategory)
-    end
+    -- controller mode and auto-roll get a page of their own, listed under CleanLoot
+    Options.controllerCategory = RegisterPage(category, BuildController())
+    Options.autoRollCategory = RegisterPage(category, BuildAutoRoll())
     Options.Refresh()
 end
 
@@ -402,4 +555,8 @@ end
 
 function Options.OpenController()
     OpenCategory(Options.controllerCategory)
+end
+
+function Options.OpenAutoRoll()
+    OpenCategory(Options.autoRollCategory)
 end

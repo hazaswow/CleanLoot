@@ -1188,6 +1188,24 @@ check(linkBox and linkBox:IsShown() and linkBox.url == "https://www.twitch.tv/ha
     "Twitch opens the box with the channel address")
 OW.link2:GetScript("OnClick")()
 check(linkBox.url == "https://ko-fi.com/hazas" and linkBox:IsShown(), "Ko-fi shows its own address in the same box")
+-- Ctrl+C copies the address, then the box closes by itself
+OW.link1.__scripts.OnClick(OW.link1)
+local ctrlDown = false
+function IsControlKeyDown() return ctrlDown end
+function IsMetaKeyDown() return false end  -- no Cmd key here (an unset global would be a truthy stub)
+linkBox.box.__scripts.OnKeyDown(linkBox.box, "C")
+WOW.Advance(0.5)
+check(linkBox:IsShown(), "C alone does not close the box")
+ctrlDown = true
+linkBox.box.__scripts.OnKeyDown(linkBox.box, "A")
+WOW.Advance(0.5)
+check(linkBox:IsShown(), "Ctrl+A does not close it")
+linkBox.box.__scripts.OnKeyDown(linkBox.box, "C")
+check(linkBox:IsShown(), "Ctrl+C leaves a moment for the copy before closing")
+WOW.Advance(0.5)
+check(not linkBox:IsShown(), "Ctrl+C closes the box once the address is copied")
+ctrlDown = false
+OW.link1.__scripts.OnClick(OW.link1)
 linkBox.box:GetScript("OnEscapePressed")()
 check(not linkBox:IsShown(), "Esc closes the box")
 
