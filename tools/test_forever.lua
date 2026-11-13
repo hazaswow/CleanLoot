@@ -1179,6 +1179,27 @@ for _, e in ipairs(R.Waiting()) do if e.key == 7001 then still = true end end
 check(not still and not R.WaitingShown(), "a decided roll is no longer waited for")
 R.Clear()
 
+-- 33b. A roll abandoned by a zone change never gets a winner: the card must not stay up for ever
+Drop(7002, { Entry("Jessa Rhodes", "DRUID", 4), Entry("Hazas War", "WARRIOR", 4, nil, true) })
+R.Watch(7002)
+R.RefreshWaiting(true)
+check(R.WaitingShown(), "an undecided roll is waited for")
+-- a loading screen with no roll of ours running any more (the roll was cancelled, no winner)
+WOW.FireEvent("PLAYER_ENTERING_WORLD")
+WOW.Advance(2)
+check(not R.WaitingShown(), "after a zone change the abandoned roll is no longer waited for")
+-- and without any zone event, the card goes once a roll could not possibly still be running
+Drop(7003, { Entry("Jessa Rhodes", "DRUID", 4), Entry("Hazas War", "WARRIOR", 4, nil, true) })
+R.Watch(7003)
+R.RefreshWaiting(true)
+check(R.WaitingShown(), "a new undecided roll brings the card back")
+WOW.Advance(200)
+check(R.WaitingShown(), "...it stays while the roll can still be running")
+WOW.Advance(60)
+check(not R.WaitingShown(), "...and goes by itself when it is far too old to be real")
+R.ForgetRolls()
+R.Clear()
+
 -- 34. The author's corner of the options: Twitch and Ko-fi, copied from a box (no browser in WoW)
 local OW = CL.Options.widgets
 check(OW.link1 and OW.link2, "the options page has a Twitch and a Ko-fi button")

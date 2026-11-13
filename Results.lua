@@ -230,6 +230,11 @@ end
 local MAX_WAIT_NAMES = 30
 local waitEntries = {}   -- what the tooltip lists now
 local waitQueued         -- a refresh is already scheduled
+local waitTicking        -- the periodic look at the card is running
+-- A roll cannot be waited on for longer than it lasts (three minutes at most, plus
+-- a margin). A drop still undecided after that never got its winner -- you left
+-- the zone before answering, say -- and must not keep the card up for ever.
+local WAIT_MAX = 240
 
 -- The rolls still waiting for somebody, oldest first:
 --   { { key, name, quality, pending = { { name, class, isSelf }, ... } }, ... }
@@ -238,8 +243,9 @@ local waitQueued         -- a refresh is already scheduled
 -- simulated ones from the simulator.
 local function WaitingEntries()
     local keys = {}
+    local now = GetTime()
     for key, since in pairs(open) do
-        if not shown[key] then keys[#keys + 1] = { key = key, since = since } end
+        if not shown[key] and now - since <= WAIT_MAX then keys[#keys + 1] = { key = key, since = since } end
     end
     table.sort(keys, function(a, b)
         if a.since ~= b.since then return a.since < b.since end
@@ -345,6 +351,14 @@ local function RefreshWaitingNow()
     if not wasShown then Results.Layout() end
     -- keep a tooltip that is open in step with the votes
     if GameTooltip:IsShown() and GameTooltip:IsOwned(waitCard) then ShowWaitingTooltip(waitCard) end
+    -- no event ends a roll that was abandoned: look again from time to time
+    if not waitTicking then
+        waitTicking = true
+        C_Timer.After(15, function()
+            waitTicking = nil
+            RefreshWaitingNow()
+        end)
+    end
 end
 
 -- Show the card while some roll still waits for somebody, hide it otherwise (or when
@@ -375,6 +389,17 @@ end
 -- What the tooltip lists now (see WaitingEntries).
 function Results.Waiting()
     return waitEntries
+end
+
+-- After a loading screen (a teleport, an instance exit): the rolls that are no longer
+-- running for you and have no winner will not get one in this zone -- stop waiting
+-- for them. `isLive(key)` says whether a roll we still show belongs to that drop.
+function Results.ForgetAbandoned(isLive)
+    local dropped = false
+    for key in pairs(open) do
+        if not isLive(key) then open[key] = nil dropped = true end
+    end
+    if dropped then Results.RefreshWaiting(true) end
 end
 
 -- Stop following every roll (a clean slate; the tests use it between scenarios).

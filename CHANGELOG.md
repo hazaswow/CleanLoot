@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.4.1
+
+**Fixed**
+- The "Waiting on rolls" card no longer stays up for ever when you leave the zone (a teleport, say) before answering a roll. It goes after the loading screen, and in any case once a roll is too old to still be running.
+
 ## 1.4.0
 
 **Auto-roll** (new; nothing is automatic until you make a rule)

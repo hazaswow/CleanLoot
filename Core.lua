@@ -493,6 +493,10 @@ watcher:SetScript("OnEvent", function(_, event, arg1, arg2, arg3)
         C_Timer.After(1.5, function()
             local ok, err = pcall(CL.RestoreRolls)
             if not ok then CL.Print("restoring the running rolls failed: " .. tostring(err)) end
+            -- a roll left behind by a zone change gets no winner: do not wait for it
+            if CL.Results and CL.Results.ForgetAbandoned then
+                CL.Results.ForgetAbandoned(function(key) return API.RollForKey(key) ~= nil end)
+            end
         end)
     elseif event == "START_LOOT_ROLL" then
         CL.Debug("START_LOOT_ROLL roll=%s time=%s key=%s", tostring(arg1), tostring(arg2), tostring(Plain(arg3)))
