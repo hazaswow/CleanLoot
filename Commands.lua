@@ -11,6 +11,7 @@ local HELP = {
     "/cll watch note [item] <text> | remove [item] | list",
     "/cll sim [n]       simulate n loot rolls (1-8) with a fake group",
     "/cll sim colors    one simulated drop of every colour",
+    "/cll sim master    a simulated master-loot roll result window",
     "/cll sim group <n> other players in the simulated group (1-39, default 4)",
     "/cll sim clear     remove the simulated rolls",
     "/cll restore       bring back rolls still running (automatic at login and /reload)",
@@ -44,6 +45,8 @@ SlashCmdList["CLEANLOOT"] = function(msg)
             CL.Print("simulated rolls cleared.")
         elseif sub == "colors" or sub == "colours" then
             CL.Sim.Colors()
+        elseif sub == "master" then
+            CL.MasterLoot.Simulate()
         elseif sub == "group" then
             local n = CL.Sim.SetGroupSize(tonumber(arg) or 4)
             CL.Print(("sim group: %d other players (applies to the next drops)."):format(n))

@@ -30,6 +30,8 @@ local DEFAULTS = {
     showWaiting = true,  -- the "waiting on rolls" card at the start of the winner popup
     autoRollEnabled = true,  -- master switch of the auto-roll rules (none exist until you make one)
     autoRollSay = true,  -- a chat line when a rule answers for you, or could not
+    masterWindow = true,  -- master loot: the roll results window, when the rolls are over
+    masterAnnounce = true,  -- master loot: the master looter's hand-outs are announced in /p or /ra
     watchEnabled = true,  -- the watchlist's pulsing outline on the roll frames (nothing is watched until you add an item)
     keyboardEnabled = false,
     keyboardInspect = false,
@@ -273,7 +275,7 @@ function API.GetResult(lootKey)
     local drop = FindDrop(lootKey)
     if not drop then return nil end
 
-    local res = { key = lootKey, rolls = {}, passes = 0 }
+    local res = { key = lootKey, rolls = {}, passes = 0, noRoll = 0 }
     res.link = Plain(drop.itemHyperlink)
     res.name, res.quality, res.texture = ItemFacts(res.link)
     res.allPassed = Plain(drop.allPassed) == true
@@ -293,6 +295,8 @@ function API.GetResult(lootKey)
                 res.rolls[#res.rolls + 1] = e
             elseif e.type == CL.ROLL.PASS then
                 res.passes = res.passes + 1
+            elseif Plain(info.state) == NO_ROLL then
+                res.noRoll = res.noRoll + 1
             end
         end
         table.sort(res.rolls, SortRolls)
@@ -539,5 +543,10 @@ watcher:SetScript("OnEvent", function(_, event, arg1, arg2, arg3)
         CL.Debug("LOOT_ROLLS_COMPLETE key=%s", tostring(Plain(arg1)))
         local ok, err = pcall(CL.Results.OnComplete, arg1)
         if not ok then CL.Print("LOOT_ROLLS_COMPLETE: " .. tostring(err)) end
+        -- in master loot the game names no winner: the roll results window takes over
+        if CL.MasterLoot then
+            ok, err = pcall(CL.MasterLoot.OnComplete, arg1)
+            if not ok then CL.Print("master loot results: " .. tostring(err)) end
+        end
     end
 end)

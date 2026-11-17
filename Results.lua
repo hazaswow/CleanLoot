@@ -122,6 +122,9 @@ local function WinnerLine(w)
     return ("%s won"):format(who)
 end
 
+-- (the master-loot window draws names and rolls the same way)
+Results.ShortName, Results.Hex, Results.ClassColor, Results.RollText = ShortName, Hex, ClassColor, RollText
+
 -- Your own roll, when you are not the winner: always shown, passed or not.
 local function MeLine(me)
     if not me then return nil end
@@ -407,6 +410,16 @@ function Results.ForgetAbandoned(isLive)
         if not isLive(key) then open[key] = nil dropped = true end
     end
     if dropped then Results.RefreshWaiting(true) end
+end
+
+-- A roll the game will never decide (master loot: the master looter hands the item out):
+-- stop waiting for a winner, and for the players who did not answer.
+function Results.Close(key)
+    key = CL.Plain(key)
+    if key == nil then return end
+    open[key] = nil
+    shown[key] = true
+    Results.RefreshWaiting()
 end
 
 -- Stop following every roll (a clean slate; the tests use it between scenarios).

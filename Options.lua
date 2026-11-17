@@ -260,6 +260,14 @@ local function Build(parent)
         function() return CL.db.minimap and CL.db.minimap.hide end,
         function(v) CL.MinimapButton.SetHidden(v) end)
 
+    Text(panel, "Master loot", 16, -432, "GameFontNormalLarge")
+    widgets.masterWindow = Checkbox(panel, "Show the roll results window", 16, -456,
+        function() return CL.db.masterWindow end,
+        function(v) CL.db.masterWindow = v end)
+    widgets.masterAnnounce = Checkbox(panel, "Announce hand-outs in /p or /ra", 16, -480,
+        function() return CL.db.masterAnnounce end,
+        function(v) CL.db.masterAnnounce = v end)
+
     -- second column, beside the short rows of the first
     Text(panel, "Loot toasts", 330, -56, "GameFontNormalLarge")
     Text(panel, "The \"You won\" banner Blizzard shows.", 330, -84, "GameFontDisableSmall")

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.6.0
+
+**Master loot** (new)
+- With a master looter the game runs the rolls but names no winner, so nothing showed once they were over. Now, when the rolls end, **everybody in the group** gets a *roll result* window for the item: every roll with the player's name (class coloured), best first (Need above Greed), ties flagged, and how many passed or did not roll. Hover the icon for the item.
+- **The master looter can click a name to give that player the item.** A small confirmation opens at the mouse; on *Give* the item is handed out from the boss's open loot window, and once the game confirms it the group is told in the chat, in /p (or /ra in a raid): `[CleanLoot] [item] given to Name for roll Greed 44`. If the game refuses (full bags, too far away, the loot window closed) nothing is announced and you are told why.
+- The "Waiting on rolls" card no longer stays up after a master-loot roll is over.
+- Two options on the *General* tab: show the window, and announce the hand-outs in the chat (both on). `/cll sim master` opens a made-up window to look at it and try the click.
+
 ## 1.5.0
 
 **Options window** (new)

@@ -1,0 +1,69 @@
+<p><strong>Clean loot roll frames for WoW Forever.</strong> See at a glance who rolled what, answer faster, and never lose a roll on a big drop. Lightweight, standalone, no other addon needed.</p>
+
+<p><img src="https://raw.githubusercontent.com/hazaswow/CleanLoot/main/assets/screenshot-roll-frames.png" alt="CleanLoot roll frames" /></p>
+<p><img src="https://raw.githubusercontent.com/hazaswow/CleanLoot/main/assets/screenshot-votes-queue.png" alt="Vote counters, the waiting queue and the hasn't-rolled-yet clock (simulated drops)" height="520" /></p>
+
+<h2>What you get</h2>
+<ul>
+<li><strong>Your own roll frames</strong> in place of Blizzard's: item tooltip (Ctrl+click to preview, Shift+click to link in chat), quality colours, timer bar, and Need / Greed / Pass.</li>
+<li><strong>Live vote counters</strong> on each button, with the list of players on hover (class coloured, with the roll once the game reveals it).</li>
+<li><strong>"Hasn't rolled yet"</strong>: a small clock with the number of players still deciding. Hover for who.</li>
+<li><strong>Winner popup</strong>: who won each roll and with what, and always your own roll. Hover a card for the item tooltip and every roll of the drop.</li>
+<li><strong>Big drops are safe</strong>: extra rolls wait in a queue and appear as you answer, timers still running. Rolls in progress come back after a /reload.</li>
+<li><strong>Less chat spam</strong>: the per-roll lines are filtered out, who won what stays visible.</li>
+</ul>
+
+<h2>Master loot <em>(new)</em></h2>
+<p>With a master looter the game names no winner. CleanLoot opens a <strong>roll result window</strong> for each item when the rolls end, for <strong>everybody in the group</strong>: every roll with the player's name, best first, ties flagged.</p>
+<ul>
+<li>The master looter <strong>clicks a name</strong> to give that player the item. A small confirmation opens at the mouse.</li>
+<li>Once the game confirms the hand-out, the group is told: <code>[CleanLoot] [item] given to Name for roll Greed 44</code>, in /p, or /ra in a raid.</li>
+</ul>
+
+<h2>Auto-roll <em>(new)</em></h2>
+<p>Stop clicking the same answer on the same items. <strong>Nothing is automatic until you make a rule.</strong></p>
+<ul>
+<li>Always <strong>Need</strong>, <strong>Greed</strong> or <strong>Pass</strong> on an item: right-click the button on its roll frame (it turns green, right-click again to forget the rule), or add it in the options.</li>
+<li>Or one answer for every <strong>green, blue, epic or legendary</strong> item. An item rule wins over a quality rule.</li>
+<li><strong>Safe by design</strong>: a rule only answers when the answer is possible. If the button is greyed out for you, or a bind-on-pickup prompt would need your confirmation, the roll stays yours. A chat line tells you what was answered, or why not.</li>
+</ul>
+
+<h2>Watchlist <em>(new)</em></h2>
+<p>Keep a list of the items you are hunting. When one drops, its roll frame gets a <strong>gently pulsing cyan outline</strong>, and the <strong>note</strong> you wrote for it (<em>BiS for my mage</em>) shows on the frame and in the icon's tooltip.</p>
+<ul>
+<li>Add an item by shift-clicking it into the box, pasting its link, or typing its id. Or with <code>/cll watch [item] [note]</code>.</li>
+<li>It only draws the eye: nothing is answered for you. (That is auto-roll, and both can apply to the same item.)</li>
+</ul>
+
+<h2>Options window <em>(new)</em></h2>
+<p><code>/cll</code> opens CleanLoot's own window, with a tab for <strong>General</strong>, <strong>Controller mode</strong>, <strong>Auto-roll</strong> and <strong>Watchlist</strong>. It is not a modal game panel: your bags, the Dungeon Journal or the chat stay open beside it, so you can shift-click an item straight into its boxes. You can move it, Esc closes it, and it opens in combat. The minimap button's right-click opens it too.</p>
+
+<h2>Controller mode <em>(off by default)</em></h2>
+<p>Made for gamepads and keyboards: select a visible roll and answer Need / Greed / Pass with keys or controller buttons you set right in the options, or with slash commands (handy in macros or OPie). Optional inspection tooltip, with Pawn upgrade info when Pawn is installed.</p>
+
+<h2>And also</h2>
+<ul>
+<li>Roll frames and winner popup can be moved, scaled, stacked up or down, and locked.</li>
+<li>Loot toast options (off by default): hide the "You won" banner, shrink it, or move it.</li>
+<li>Blizzard's own roll frames are hidden (an option brings them back).</li>
+<li>Minimap button: left-click for the loot history, right-click for the options.</li>
+<li>Built-in drop simulator (<code>/cll sim</code>) to try everything without a real drop.</li>
+</ul>
+
+<h2>Commands</h2>
+<ul>
+<li><code>/cll</code>: open or close the options window</li>
+<li><code>/cll auto need|greed|pass [item]</code>: always roll that way on an item. <code>/cll auto remove [item]</code>, <code>/cll auto list</code></li>
+<li><code>/cll watch [item] [note]</code>: highlight an item when it drops. <code>/cll watch note|remove|list</code></li>
+<li><code>/cll next</code>, <code>/cll previous</code>, <code>/cll inspect</code>, <code>/cll need</code>, <code>/cll greed</code>, <code>/cll pass</code>: controller mode</li>
+<li><code>/cll sim [n]</code>: simulate loot rolls (a watched item always comes first)</li>
+<li><code>/cll debug on</code>: trace every roll in chat</li>
+</ul>
+
+<h2>Reporting bugs</h2>
+<p>Forever is still in beta and its API changes. If something breaks after a client update, run <code>/cll debug on</code>, reproduce it, and share the chat lines with your client build, on <a href="https://github.com/hazaswow/CleanLoot/issues">GitHub</a> or in the comments.</p>
+<p>Source and releases: <a href="https://github.com/hazaswow/CleanLoot">https://github.com/hazaswow/CleanLoot</a></p>
+
+<h2>Who makes this</h2>
+<p>I'm Hazas, and I stream WoW on Twitch, come say hi: <a href="https://www.twitch.tv/hazaswow">https://www.twitch.tv/hazaswow</a></p>
+<p>If CleanLoot saves you some clicks and you'd like to help me pay my Claude subscription, there's a Ko-fi: <a href="https://ko-fi.com/hazas">https://ko-fi.com/hazas</a></p>
