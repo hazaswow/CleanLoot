@@ -317,7 +317,7 @@ function Sim.Start(n)
     if n < 1 then n = 1 end
     if n > 8 then n = 8 end
     local byQuality = RealItemsByQuality()
-    local watched = CL.Watchlist and CL.Watchlist.Random()
+    local watched = CL.db.watchEnabled and CL.Watchlist and CL.Watchlist.Random() or nil
     local ids = {}
     for i = 1, n do
         if i == 1 and watched then

@@ -11,8 +11,6 @@ local _, CL = ...
 local Watchlist = {}
 CL.Watchlist = Watchlist
 
-local Plain = CL.Plain
-
 -- Long notes would not fit on a roll frame.
 Watchlist.MAX_NOTE = 60
 
@@ -163,7 +161,8 @@ function Watchlist.Command(arg)
             return
         end
         Watchlist.Add(id, CL.AutoRoll.NameOf(id, word), note)
-        CL.Print(("%s is on the watchlist%s."):format(CL.AutoRoll.NameOf(id, word),
-            CleanNote(note) ~= "" and (": " .. CleanNote(note)) or ""))
+        CL.Print(("%s is on the watchlist%s%s."):format(CL.AutoRoll.NameOf(id, word),
+            CleanNote(note) ~= "" and (": " .. CleanNote(note)) or "",
+            CL.db.watchEnabled and "" or " (the highlight is switched off in the options)"))
     end
 end

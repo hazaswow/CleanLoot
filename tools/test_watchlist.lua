@@ -278,11 +278,21 @@ for _ = 1, 30 do
 end
 check(seen["555555"] and seen["2589"], "with several watched items each one comes up")
 
--- a switched-off highlight does not stop /cll sim from using the list
+-- a switched-off highlight: the drop shows, not highlighted, and the list is not forced into /cll sim
 CL.db.watchEnabled = false
 WL.Add(2589, "Item2589")
 CL.Sim.Start(1)
 check(RF.ActiveCount() == 1 and not RF.VisibleFrames()[1].watched, "with the highlight off the drop shows, but not highlighted")
+CL.RollFrames.StopAll()
+CL.Sim.Clear()
+CL.Sim.Start(3)
+check(RF.ActiveCount() == 3, "with the highlight off /cll sim still gives three drops")
+said = {}
+SlashCmdList.CLEANLOOT("watch item:3001")
+check(sayMatches("the highlight is switched off"), "adding an item while the highlight is off says so")
+reset()
+SlashCmdList.CLEANLOOT("watch item:3002")
+check(not sayMatches("switched off"), "...and says nothing of the kind while it is on")
 reset()
 
 print = realPrint

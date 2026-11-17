@@ -683,7 +683,6 @@ end
 
 local function CreateWindow()
     local f = CreateFrame("Frame", "CleanLootOptions", UIParent)
-    Options.window = f
     f:SetSize(WINDOW_W, WINDOW_H)
     f:SetFrameStrata("HIGH")
     f:SetToplevel(true)
@@ -756,6 +755,7 @@ local function CreateWindow()
         table.insert(UISpecialFrames, "CleanLootOptions")
     end
     f:Hide()
+    Options.window = f   -- only once it is whole: a page that failed to build leaves no half window
     return f
 end
 
