@@ -200,6 +200,7 @@ function print(...)
 end
 
 SlashCmdList = {}
+UISpecialFrames = {}   -- frames Esc closes
 function date(fmt) return os.date(fmt) end
 function IsControlKeyDown() return WOW.ctrl or false end
 function IsShiftKeyDown() return WOW.shift or false end
@@ -307,6 +308,10 @@ function hooksecurefunc(target, name, fn)
         return result
     end
 end
+
+-- What a shift-click on an item calls to put its link in the chat line (retail names it
+-- ChatFrameUtil.InsertLink; the old global ChatEdit_InsertLink is not there).
+ChatFrameUtil = { InsertLink = function(text) return false end }
 
 -- Blizzard's native roll frames: a managed container holding named roll frames,
 -- each with an icon button and a container of roll buttons (shape taken from the

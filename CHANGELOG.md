@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.5.0
+
+**Options window** (new)
+- `/cll`, a right-click on the minimap button, or the button in *Game Menu → Options → AddOns → CleanLoot* now opens CleanLoot's own window, with a tab per page (General, Controller mode, Auto-roll, Watchlist). It is not one of the game's modal panels: the bags, the Dungeon Journal or the chat can stay open next to it (so you can shift-click an item into its boxes), you can move it, Esc closes it, and it opens in combat. `/cll` opens it, and closes it again.
+
+**Watchlist** (new; nothing is highlighted until you add an item)
+- Keep a list of items you want to be reminded of. When one drops, its roll frame gets a gently pulsing outline, and an optional note you wrote for it (*BiS for my mage*) shows on the frame and in the icon's tooltip.
+- Add an item on the new *Watchlist* tab (shift-click it into the box, or paste its link or its id), or with `/cll watch [item] [note]`. Edit a note right in the list, or with `/cll watch note [item] <text>`.
+- It only draws the eye: a watched item is never rolled for you. Auto-roll is separate, and both can apply to one item.
+- `/cll sim` always drops one watched item first, so you can see it without waiting for a real drop.
+
+**Winner popup**
+- Hovering a result card now shows the item's own tooltip first, then who rolled what.
+
 ## 1.4.1
 
 **Fixed**

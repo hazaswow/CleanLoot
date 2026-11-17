@@ -296,15 +296,35 @@ function Sim.StartItem(itemID)
     return StartRoll({ name = name, link = link, display = link, quality = quality, icon = icon })
 end
 
--- n drops (1-8) from the loot table. Returns the rollIDs.
+-- A roll for an item of the watchlist, so its highlight can always be tested. The
+-- client may not know the item (not cached yet): then it is made up from what the
+-- list remembers, with a link of its own so the frame still recognises it.
+local function WatchedDescription(entry)
+    local name, link, quality, _, _, _, _, _, _, icon = ItemInfo(entry.id)
+    if name then
+        return { name = name, link = link, display = link, quality = quality, icon = icon }
+    end
+    if C_Item and C_Item.RequestLoadItemDataByID then C_Item.RequestLoadItemDataByID(entry.id) end
+    local made = ("|cff0070dd|Hitem:%d::::::::|h[%s]|h|r"):format(entry.id, entry.name)
+    return { name = entry.name, link = made, display = made, quality = 3,
+        icon = "Interface\\Icons\\INV_Misc_QuestionMark" }
+end
+
+-- n drops (1-8) from the loot table. Returns the rollIDs. When the watchlist has
+-- an item, the first drop is always one of them, to have something to look at.
 function Sim.Start(n)
     n = math.floor(tonumber(n) or 1)
     if n < 1 then n = 1 end
     if n > 8 then n = 8 end
     local byQuality = RealItemsByQuality()
+    local watched = CL.Watchlist and CL.Watchlist.Random()
     local ids = {}
-    for _ = 1, n do
-        ids[#ids + 1] = StartRoll(DescribeQuality(PickQuality(), byQuality))
+    for i = 1, n do
+        if i == 1 and watched then
+            ids[#ids + 1] = StartRoll(WatchedDescription(watched))
+        else
+            ids[#ids + 1] = StartRoll(DescribeQuality(PickQuality(), byQuality))
+        end
     end
     return ids
 end

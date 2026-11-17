@@ -30,6 +30,7 @@ local DEFAULTS = {
     showWaiting = true,  -- the "waiting on rolls" card at the start of the winner popup
     autoRollEnabled = true,  -- master switch of the auto-roll rules (none exist until you make one)
     autoRollSay = true,  -- a chat line when a rule answers for you, or could not
+    watchEnabled = true,  -- the watchlist's pulsing outline on the roll frames (nothing is watched until you add an item)
     keyboardEnabled = false,
     keyboardInspect = false,
     keyboardInspectSticky = false,  -- the inspection tooltip stays on the selected roll (off: only while the mouse is over a roll)

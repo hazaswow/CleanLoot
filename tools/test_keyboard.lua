@@ -31,24 +31,24 @@ SlashCmdList.CLEANLOOT("need")
 check(K.SelectedID() == nil and #rolls == 0 and not a.selection:IsShown(), "disabled commands do not select or roll")
 check(not a.buttons[CL.ROLL.NEED].binding:IsShown(), "bindings are hidden when keyboard rolls are disabled")
 local W = CL.Options.widgets
-local controllerPage = WOW.subcategories and WOW.subcategories["Controller mode"]
-check(controllerPage and controllerPage.parent == WOW.category and controllerPage.name == "Controller mode"
-    and controllerPage.panel == CL.Options.controllerPanel and CL.Options.controllerPanel ~= CL.Options.panel,
-    "controller mode has its own page, listed under CleanLoot")
+local controllerPage = CL.Options.pages.controller
+check(controllerPage and controllerPage.panel == CL.Options.controllerPanel and CL.Options.controllerPanel ~= CL.Options.panel,
+    "controller mode has its own page, a tab of the options window")
 check(W.keyboard:GetParent() == CL.Options.controllerPanel and W.inspect:GetParent() == CL.Options.controllerPanel
     and W.pawn:GetParent() == CL.Options.controllerPanel and W.key1:GetParent() == CL.Options.controllerPanel
     and W.inspectLeft:GetParent() == CL.Options.controllerPanel, "...with all of its options")
 check(W.minimap:GetParent() == CL.Options.panel and W.sim:GetParent() == CL.Options.panel
     and W.waiting:GetParent() == CL.Options.panel, "...and the rest stays on the main page")
-WOW.openedCategory = nil
-W.controllerOpen.__scripts.OnClick(W.controllerOpen)
-check(WOW.openedCategory == 100, "a button on the main page opens the controller page")
-WOW.openedCategory = nil
+CL.Options.window:Hide()
 SlashCmdList.CLEANLOOT("controller")
-check(WOW.openedCategory == 100, "/cll controller opens it too")
-WOW.openedCategory = nil
+check(CL.Options.window:IsShown() and CL.Options.CurrentPage() == "controller"
+    and CL.Options.controllerPanel:IsShown(), "/cll controller opens the window on that page")
 SlashCmdList.CLEANLOOT("")
-check(WOW.openedCategory == 99, "/cll still opens the main page")
+check(not CL.Options.window:IsShown(), "/cll closes it")
+CL.Options.Open("general")
+check(CL.Options.window:IsShown() and CL.Options.panel:IsShown() and not CL.Options.controllerPanel:IsShown(),
+    "the main page is the General tab")
+CL.Options.window:Hide()
 check(W.keyboard and W.inspect and W.inspectSticky and W.inspectLeft, "controller-mode settings exist (inspection is a checkbox)")
 check(not W.inspect:IsEnabled() and not W.inspectSticky:IsEnabled() and not W.inspectLeft:IsEnabled(),
     "the inspection options are greyed out while keyboard rolls are off")

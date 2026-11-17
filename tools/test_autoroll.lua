@@ -181,19 +181,32 @@ check(AR.ItemRule(999) == nil, "/cll auto remove [link] forgets the rule")
 said = {}
 SlashCmdList.CLEANLOOT("auto need")
 check(AR.ItemRule(0) == nil and sayMatches("give an item"), "/cll auto need without an item says what is missing")
-WOW.openedCategory = nil
-check(pcall(SlashCmdList.CLEANLOOT, "auto") and WOW.openedCategory == WOW.subcategories["Auto-roll"].ID,
+CL.Options.window:Hide()
+check(pcall(SlashCmdList.CLEANLOOT, "auto") and CL.Options.window:IsShown() and CL.Options.CurrentPage() == "auto",
     "/cll auto opens the auto-roll page")
+CL.Options.window:Hide()
 reset()
 
 -- 13. The options page
 local W = CL.Options.widgets
-check(W.autoRollOpen and W.autoOn and W.autoSay and W.autoList and W.autoBox, "the auto-roll page and its button exist")
-check(CL.Options.autoRollCategory ~= nil and WOW.subcategories["Auto-roll"].parent == WOW.category,
-    "the page is registered under CleanLoot")
-WOW.openedCategory = nil
-W.autoRollOpen.__scripts.OnClick(W.autoRollOpen)
-check(WOW.openedCategory == WOW.subcategories["Auto-roll"].ID, "the button on the main page opens it")
+check(W.autoOn and W.autoSay and W.autoList and W.autoBox, "the auto-roll page exists")
+check(CL.Options.pages.auto and CL.Options.pages.auto.panel == CL.Options.autoRollPanel,
+    "it is a tab of the options window")
+-- a shift-click on an item goes into the box that has the focus
+do
+    local box = W.autoBox
+    local link = "|cffa335ee|Hitem:700::::::::|h[Shifted]|h|r"
+    rawset(box, "Insert", function(self, t) self:SetText(self:GetText() .. t) end)
+    box:SetText("")
+    rawset(box, "HasFocus", function() return false end)
+    ChatFrameUtil.InsertLink(link)
+    check(box:GetText() == "", "a shift-click does nothing while the box has no focus")
+    rawset(box, "HasFocus", function() return true end)
+    ChatFrameUtil.InsertLink(link)
+    check(box:GetText() == link, "...and goes into the box while it has the focus (ChatFrameUtil.InsertLink)")
+    box:SetText("")
+end
+
 AR.SetItem(500, N, "Alpha")
 AR.SetItem(501, G, "Beta")
 CL.Options.Refresh()

@@ -139,8 +139,15 @@ local function ShowTooltip(card)
     local res = card.result
     if not res then return end
     GameTooltip:SetOwner(card, "ANCHOR_RIGHT")
-    local r, g, b = CL.QualityColor(res.quality)
-    GameTooltip:AddLine(res.name or "?", r, g, b)
+    -- the item's own tooltip first (its name, stats...), then who rolled what below it;
+    -- an item with no link (a made-up simulator one) gets just its name
+    local withItem = res.link and pcall(GameTooltip.SetHyperlink, GameTooltip, res.link)
+    if withItem then
+        GameTooltip:AddLine(" ")
+    else
+        local r, g, b = CL.QualityColor(res.quality)
+        GameTooltip:AddLine(res.name or "?", r, g, b)
+    end
     for _, e in ipairs(res.rolls) do
         local nr, ng, nb = ClassColor(e.class)
         local who = ShortName(e.name)

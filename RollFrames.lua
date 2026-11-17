@@ -9,6 +9,8 @@ CL.RollFrames = RF
 
 local MAX_FRAMES = 8
 local FRAME_W, FRAME_H = 252, 70
+local NOTE_H = 14   -- a watchlist note adds one line to the frame
+local WATCH_R, WATCH_G, WATCH_B = 0.25, 1, 0.95   -- the watchlist's outline and note: cyan, no quality uses it
 local SPACING = 6
 local FLAT = "Interface\\Buttons\\WHITE8X8"
 local BACKDROP = {
@@ -212,6 +214,21 @@ local function CreateRollFrame(index)
     selection:SetBackdropBorderColor(1, 1, 1, 1)
     selection:Hide()
     f.selection = selection
+
+    -- watchlist: a thin outline inside the frame that pulses gently (the white selection
+    -- outline of controller mode stays outside, so both can show)
+    local watch = CreateFrame("Frame", nil, f, "BackdropTemplate")
+    watch:SetPoint("TOPLEFT", f, "TOPLEFT", 1, -1)
+    watch:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -1, 1)
+    watch:SetBackdrop({ edgeFile = FLAT, edgeSize = 2 })
+    watch:SetBackdropBorderColor(WATCH_R, WATCH_G, WATCH_B, 1)
+    watch:Hide()
+    watch.t = 0
+    watch:SetScript("OnUpdate", function(self, elapsed)
+        self.t = self.t + (elapsed or 0)
+        self:SetAlpha(0.7 + 0.3 * math.sin(self.t * 4.5))   -- about 1.4 s a cycle, between 40% and 100%
+    end)
+    f.watch = watch
     f:EnableMouse(true)
     f:RegisterForDrag("LeftButton")
     f:SetScript("OnDragStart", function(self)
@@ -246,6 +263,11 @@ local function CreateRollFrame(index)
             local r, g, b = CL.QualityColor(f.quality)
             GameTooltip:SetText(f.itemName, r, g, b)
         end
+        if f.watched then
+            local note = f.watchNote
+            GameTooltip:AddLine(note and note ~= "" and ("Watchlist: " .. note) or "On your watchlist",
+                WATCH_R, WATCH_G, WATCH_B, true)
+        end
         GameTooltip:Show()
     end)
     icon:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -262,6 +284,16 @@ local function CreateRollFrame(index)
     name:SetJustifyH("LEFT")
     name:SetWordWrap(false)
     f.name = name
+
+    -- the watchlist note, in the line left under the timer bar when the frame is a little taller
+    local note = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    note:SetPoint("TOPLEFT", f, "TOPLEFT", 50, -43)
+    note:SetSize(190, 11)
+    note:SetJustifyH("LEFT")
+    note:SetWordWrap(false)
+    note:SetTextColor(WATCH_R, WATCH_G, WATCH_B)
+    note:Hide()
+    f.note = note
 
     -- "Hasn't rolled yet": a small clock in the top-right corner with how many
     -- players are still deciding; hover lists them. Hidden when nobody is waiting.
@@ -416,6 +448,30 @@ function RF.RefreshAuto()
     for _, f in ipairs(active) do ApplyAuto(f) end
 end
 
+-- Watched items: the pulsing outline, and the note on its own line (the frame grows to fit it).
+local function ApplyWatch(f)
+    local note = f.rollID and CL.Watchlist and CL.Watchlist.Lookup(f.link) or nil
+    local watched = note ~= nil
+    if watched and not f.watched then f.watch.t = 0 end   -- start the pulse from the top
+    f.watched, f.watchNote = watched, note
+    if watched then f.watch:Show() else f.watch:Hide() end
+    if watched and note ~= "" then
+        f.note:SetText(note)
+        f.note:Show()
+        f:SetHeight(FRAME_H + NOTE_H)
+    else
+        f.note:SetText("")
+        f.note:Hide()
+        f:SetHeight(FRAME_H)
+    end
+end
+
+-- The watchlist changed: the open frames show it.
+function RF.RefreshWatch()
+    for _, f in ipairs(active) do ApplyWatch(f) end
+    RF.Layout()
+end
+
 -------------------------------------------------
 -- Public API
 -------------------------------------------------
@@ -450,6 +506,7 @@ local function Open(f, rollID, info, link, endTime, duration)
     SetButtonAvailable(f.buttons[CL.ROLL.GREED], info.canGreed)
     SetButtonAvailable(f.buttons[CL.ROLL.PASS], true)
     ApplyAuto(f)
+    ApplyWatch(f)
 
     f.duration = duration
     f.endTime = endTime
@@ -514,6 +571,8 @@ function RF.Stop(rollID)
     byRollID[rollID] = nil
     f.rollID, f.link, f.endTime = nil, nil, nil
     f.itemName, f.quality, f.bop, f.votes, f.expiredFor = nil, nil, nil, nil, nil
+    f.watched, f.watchNote = nil, nil
+    f.watch:Hide()
     local removedIndex
     for i, a in ipairs(active) do
         if a == f then removedIndex = i table.remove(active, i) break end

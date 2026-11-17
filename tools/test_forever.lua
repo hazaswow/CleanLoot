@@ -412,7 +412,9 @@ obj.OnClick(nil, "LeftButton")
 check(not GroupLootHistoryFrame:IsShown(), "left-click again closes it")
 
 obj.OnClick(nil, "RightButton")
-check(WOW.openedCategory == 99, "right-click opens the options panel")
+check(CL.Options.window:IsShown(), "right-click opens the options window")
+obj.OnClick(nil, "RightButton")
+check(not CL.Options.window:IsShown(), "...and a second right-click closes it")
 
 WOW.shift = true
 obj.OnClick(nil, "LeftButton")
@@ -428,7 +430,11 @@ check(CL.db.minimap.hide == false and WOW.dbicon.hidden["CleanLoot"] == false, "
 -- 18. Options panel in the game's AddOns settings
 check(WOW.category and WOW.category.name == "CleanLoot" and WOW.registeredCategory == WOW.category,
     "an AddOns settings category 'CleanLoot' is registered")
-check(WOW.category.panel == CL.Options.panel, "...and it is our panel")
+check(WOW.category.panel == CL.Options.settingsPanel, "...and it is a small page that points at our window")
+CL.Options.window:Hide()
+CL.Options.widgets.settingsOpen.__scripts.OnClick(CL.Options.widgets.settingsOpen)
+check(CL.Options.window:IsShown(), "...whose button opens the options window")
+CL.Options.window:Hide()
 
 local W = CL.Options.widgets
 CL.db.growDirection = "DOWN"  -- an earlier scenario left it on UP
@@ -482,12 +488,51 @@ check(CL.Sim.ActiveCount() == 5, "the 'One of each colour' button works")
 CL.Sim.Clear()
 
 CL.Options.Open()
-check(WOW.openedCategory == 99, "Options.Open() opens the registered category")
-WOW.openedCategory = nil
+check(CL.Options.window:IsShown(), "Options.Open() shows the options window")
+CL.Options.window:Hide()
 WOW.combat = true
 CL.Options.Open()
-check(WOW.openedCategory == nil, "the options do not open during combat")
+check(CL.Options.window:IsShown(), "the window opens during combat too (it is not one of the game's protected panels)")
+CL.Options.window:Hide()
 WOW.combat = false
+
+-- 18b. The options are a window of our own, not a modal page of the game's settings
+do
+    local O = CL.Options
+    local win = O.window
+    check(win and win:GetName() == "CleanLootOptions" and win:GetParent() == UIParent,
+        "the options live in a window of our own, a plain child of UIParent")
+    local inEsc = false
+    for _, n in ipairs(UISpecialFrames) do if n == "CleanLootOptions" then inEsc = true end end
+    check(inEsc, "Esc closes it, like the game's own windows")
+    check(win:GetFrameStrata() == "HIGH" and win.close ~= nil, "it sits above the bags, with a close button")
+    WOW.openedCategory = nil
+    O.Open("general")
+    check(WOW.openedCategory == nil and win:IsShown(), "opening it does not go through the game's settings")
+    for _, k in ipairs({ "general", "controller", "auto", "watch" }) do
+        check(O.pages[k] and O.pages[k].panel:GetParent() == win.content and O.pages[k].tab ~= nil,
+            "the " .. k .. " page is a tab of the window")
+    end
+    check(O.pages.general.panel:IsShown() and not O.pages.watch.panel:IsShown()
+        and not O.pages.auto.panel:IsShown() and not O.pages.controller.panel:IsShown(),
+        "only the chosen page is shown")
+    O.pages.watch.tab.__scripts.OnClick(O.pages.watch.tab)
+    check(O.CurrentPage() == "watch" and O.pages.watch.panel:IsShown() and not O.pages.general.panel:IsShown(),
+        "a tab shows its page and hides the previous one")
+    win:Hide()
+    O.Toggle()
+    check(win:IsShown() and O.CurrentPage() == "watch", "reopening it brings back the page it was on")
+    O.Toggle()
+    check(not win:IsShown(), "Toggle closes it")
+    O.Open("nonsense")
+    check(win:IsShown() and O.CurrentPage() == "watch", "an unknown page name just opens it")
+    CL.db.optionsPoint = nil
+    win.__scripts.OnDragStop(win)
+    check(type(CL.db.optionsPoint) == "table" and CL.db.optionsPoint[1] == "CENTER", "moving it saves its position")
+    win:Hide()
+    O.Open("general")
+    win:Hide()
+end
 
 -- 19. Chat spam filter: the roll lines go, your own win and the loot receipt stay
 local hide = WOW.chatFilters["CHAT_MSG_LOOT"]
@@ -864,12 +909,14 @@ end
 CL.db.toastScale = nil
 
 -- 29. The slash command: /cll opens the options, the rest is testing tools
-WOW.openedCategory = nil
+CL.Options.window:Hide()
 SlashCmdList["CLEANLOOT"]("")
-check(WOW.openedCategory ~= nil, "/cll opens the options panel")
-WOW.openedCategory = nil
+check(CL.Options.window:IsShown(), "/cll opens the options window")
+SlashCmdList["CLEANLOOT"]("")
+check(not CL.Options.window:IsShown(), "/cll again closes it")
 SlashCmdList["CLEANLOOT"]("options")
-check(WOW.openedCategory ~= nil, "/cll options opens it too")
+check(CL.Options.window:IsShown(), "/cll options opens it too")
+CL.Options.window:Hide()
 WOW.chat = {}
 SlashCmdList["CLEANLOOT"]("help")
 local help = table.concat(WOW.chat, "\n")
@@ -941,6 +988,9 @@ check(tip:find("Epic Thing", 1, true) and tip:find("Jessa Rhodes", 1, true) and 
     and tip:find(DICE .. " 98", 1, true) and tip:find("You | " .. COIN .. " 6", 1, true) and tip:find("1 passed", 1, true),
     "hovering lists every roll, yours included, and the passes")
 check(tip:find(DICE .. " 98", 1, true) < tip:find(COIN .. " 52", 1, true), "...Need before Greed")
+check(GameTooltip.link and GameTooltip.link:find("Epic Thing", 1, true) and GameTooltip.lines[1] == GameTooltip.link,
+    "the tooltip starts with the item's own tooltip")
+check(GameTooltip.lines[2] == " " and GameTooltip.lines[3] ~= nil, "...then a gap, then the rolls")
 WOW.Advance(20)
 check(R.ActiveCount() == 1, "a card under the mouse stays")
 c1.__scripts.OnLeave(c1)

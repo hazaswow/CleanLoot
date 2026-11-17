@@ -1,11 +1,14 @@
 local _, CL = ...
 
 local HELP = {
-    "/cll               open the options panel",
-    "/cll controller    open the controller mode page of the options",
-    "/cll auto          open the auto-roll page of the options",
+    "/cll               open or close the options window",
+    "/cll controller    open the controller mode page of the options window",
+    "/cll auto          open the auto-roll page of the options window",
     "/cll auto need|greed|pass [item]  always roll that way on an item (shift-click it)",
     "/cll auto remove [item] | list    forget an item's rule | list the rules",
+    "/cll watch         open the watchlist page of the options window",
+    "/cll watch [item] [note]  highlight an item when it drops, with an optional note",
+    "/cll watch note [item] <text> | remove [item] | list",
     "/cll sim [n]       simulate n loot rolls (1-8) with a fake group",
     "/cll sim colors    one simulated drop of every colour",
     "/cll sim group <n> other players in the simulated group (1-39, default 4)",
@@ -23,13 +26,17 @@ SlashCmdList["CLEANLOOT"] = function(msg)
     local cmd, rest = (msg or ""):match("^%s*(%S*)%s*(.-)%s*$")
     cmd, rest = cmd:lower(), rest:lower()
 
-    if cmd == "" or cmd == "options" or cmd == "config" then
+    if cmd == "" then
+        CL.Options.Toggle()
+    elseif cmd == "options" or cmd == "config" then
         CL.Options.Open()
     elseif cmd == "controller" then
         CL.Options.OpenController()
     elseif cmd == "auto" then
         -- the argument keeps its case: an item link must not be lowercased
         CL.AutoRoll.Command((msg or ""):match("^%s*%S+%s*(.-)%s*$"))
+    elseif cmd == "watch" then
+        CL.Watchlist.Command((msg or ""):match("^%s*%S+%s*(.-)%s*$"))
     elseif cmd == "sim" then
         local sub, arg = rest:match("^(%S*)%s*(.-)$")
         if sub == "clear" then

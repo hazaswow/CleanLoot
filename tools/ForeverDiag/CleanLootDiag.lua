@@ -12,7 +12,7 @@
 -- client does (secret values, missing APIs, unknown events).
 
 local isSecret = _G.issecretvalue or function() return false end
-local MAX_LOG = 1200
+local MAX_LOG = 2500
 local PREFIX = "|cff33ff99CleanLootDiag|r: "
 
 CleanLootDiagDB = CleanLootDiagDB or {}
@@ -271,7 +271,54 @@ local EVENTS = {
     "LOOT_HISTORY_ROLL_CHANGED", "LOOT_HISTORY_ROLL_COMPLETE", "LOOT_HISTORY_AUTO_SHOW",
     "CHAT_MSG_LOOT", "ENCOUNTER_LOOT_RECEIVED", "LOOT_READY", "LOOT_CLOSED",
     "GROUP_ROSTER_UPDATE",
+    -- master loot: the looter asks for /roll in chat, results come back as system lines
+    "CHAT_MSG_SYSTEM", "CHAT_MSG_PARTY", "CHAT_MSG_PARTY_LEADER",
+    "CHAT_MSG_RAID", "CHAT_MSG_RAID_LEADER", "CHAT_MSG_RAID_WARNING",
+    "OPEN_MASTER_LOOT_LIST", "UPDATE_MASTER_LOOT_LIST", "PARTY_LOOT_METHOD_CHANGED",
 }
+
+-- Chat is noisy: only the lines that can be a roll or a loot announcement are kept.
+local FILTERED = {
+    CHAT_MSG_SYSTEM = true, CHAT_MSG_PARTY = true, CHAT_MSG_PARTY_LEADER = true,
+    CHAT_MSG_RAID = true, CHAT_MSG_RAID_LEADER = true, CHAT_MSG_RAID_WARNING = true,
+}
+local function Interesting(event, text)
+    if type(text) ~= "string" or isSecret(text) then return false end
+    local ok, hit = pcall(function()
+        local low = text:lower()
+        if low:find("roll", 1, true) then return true end
+        return event ~= "CHAT_MSG_SYSTEM" and text:find("|Hitem", 1, true) ~= nil
+    end)
+    return ok and hit
+end
+
+local lastMethod
+local function LogLootMethod(why)
+    local okM, method, masterParty, masterRaid
+    if _G.C_PartyInfo and C_PartyInfo.GetLootMethod then
+        okM, method, masterParty, masterRaid = pcall(C_PartyInfo.GetLootMethod)
+    elseif _G.GetLootMethod then
+        okM, method, masterParty, masterRaid = pcall(GetLootMethod)
+    end
+    local line = ("%s method=%s master=%s/%s"):format(okM and "ok" or "unavailable",
+        S(method), S(masterParty), S(masterRaid))
+    if line ~= lastMethod then    -- only when it changes (LOOT_READY fires all the time)
+        lastMethod = line
+        Log("LOOTMETHOD (" .. why .. ") " .. line)
+    end
+end
+
+HANDLERS.PARTY_LOOT_METHOD_CHANGED = function() LogLootMethod("changed") end
+HANDLERS.LOOT_READY = function() LogLootMethod("loot window") end
+HANDLERS.OPEN_MASTER_LOOT_LIST = function()
+    local n = _G.GetNumGroupMembers and GetNumGroupMembers() or 0
+    local out = {}
+    for i = 1, 40 do
+        local ok, name = pcall(GetMasterLootCandidate, 1, i)
+        if ok and name then out[#out + 1] = S(name) end
+    end
+    Log(("MASTERLOOT candidates for slot 1 (group of %s): %s"):format(tostring(n), table.concat(out, ", ")))
+end
 
 local frame = CreateFrame("Frame")
 for _, ev in ipairs(EVENTS) do
@@ -280,7 +327,8 @@ for _, ev in ipairs(EVENTS) do
 end
 
 frame:SetScript("OnEvent", function(self, event, ...)
-    if event ~= "GROUP_ROSTER_UPDATE" then
+    local skip = event == "GROUP_ROSTER_UPDATE" or (FILTERED[event] and not Interesting(event, (...)))
+    if not skip then
         local n, args = Pack(...)
         local vals = {}
         for i = 1, n do vals[i] = S(args[i]) end

@@ -1,7 +1,6 @@
--- Options panel, under Game Menu > Options > AddOns > CleanLoot. A canvas
--- category (the way addons already running on Forever register theirs), with
--- plain widgets of our own: no dependency on Blizzard's option templates beyond
--- the check button and the button.
+-- Options: a window of our own (/cll), with a page per topic, built from plain
+-- widgets with no dependency on Blizzard's option templates beyond the check button
+-- and the button. The game's settings only keep a small page that opens it.
 
 local _, CL = ...
 
@@ -220,9 +219,9 @@ local function SetDirection(direction)
     CL.RollFrames.Layout()
 end
 
-local function Build()
-    local panel = CreateFrame("Frame")
-    panel.name = "CleanLoot"
+local function Build(parent)
+    local panel = CreateFrame("Frame", nil, parent)
+    panel.name = "General"
     Options.panel = panel
 
     Text(panel, "CleanLoot", 16, -16, "GameFontNormalLarge")
@@ -260,15 +259,6 @@ local function Build()
     widgets.minimap = Checkbox(panel, "Hide the minimap button", 16, -392,
         function() return CL.db.minimap and CL.db.minimap.hide end,
         function(v) CL.MinimapButton.SetHidden(v) end)
-
-    -- controller mode and auto-roll each have a page of their own, under this one
-    Text(panel, "More options", 16, -430, "GameFontNormalLarge")
-    widgets.controllerOpen = PushButton(panel, "Controller mode options", 20, -458, 190, function()
-        Options.OpenController()
-    end)
-    widgets.autoRollOpen = PushButton(panel, "Auto-roll options", 20, -488, 190, function()
-        Options.OpenAutoRoll()
-    end)
 
     -- second column, beside the short rows of the first
     Text(panel, "Loot toasts", 330, -56, "GameFontNormalLarge")
@@ -316,8 +306,8 @@ local function Build()
 
     -- a discreet corner: who makes this, and where to find them
     for i, link in ipairs(LINKS) do
-        Text(panel, link.text, link.textX, -566, "GameFontDisableSmall")
-        widgets["link" .. i] = PushButton(panel, link.label, link.buttonX, -561, 70, function() ShowLink(link) end)
+        Text(panel, link.text, link.textX, -540, "GameFontDisableSmall")
+        widgets["link" .. i] = PushButton(panel, link.label, link.buttonX, -535, 70, function() ShowLink(link) end)
     end
 
     -- values may have changed through a slash command since the panel was built
@@ -326,8 +316,8 @@ local function Build()
 end
 
 -- The page of controller mode: the switch, the inspection tooltip and the keys.
-local function BuildController()
-    local panel = CreateFrame("Frame")
+local function BuildController(parent)
+    local panel = CreateFrame("Frame", nil, parent)
     panel.name = "Controller mode"
     Options.controllerPanel = panel
 
@@ -391,12 +381,30 @@ local function TextBox(parent, x, y, width)
     return box
 end
 
+-- A shift-click on an item (bags, loot, chat, the Dungeon Journal) goes into `box` while it
+-- has the focus. The client's function that puts a link in the chat line is
+-- ChatFrameUtil.InsertLink (ChatEdit_InsertLink on older clients): hooking it is how the
+-- addons already installed on Forever do it. Hook only one of them, so a link is not
+-- inserted twice.
+local function TakeLinks(box)
+    if not rawget(_G, "hooksecurefunc") then return end
+    local function insert(text)
+        if type(text) == "string" and box:HasFocus() then box:Insert(text) end
+    end
+    local util = rawget(_G, "ChatFrameUtil")
+    if type(util) == "table" and type(util.InsertLink) == "function" then
+        hooksecurefunc(util, "InsertLink", insert)
+    elseif rawget(_G, "ChatEdit_InsertLink") then
+        hooksecurefunc("ChatEdit_InsertLink", insert)
+    end
+end
+
 local AUTO_ROWS = 10  -- item rules shown at once; the mouse wheel scrolls the rest
 
 -- The page of auto-roll: the switch, a rule per quality, and the item rules.
-local function BuildAutoRoll()
+local function BuildAutoRoll(parent)
     local AR = CL.AutoRoll
-    local panel = CreateFrame("Frame")
+    local panel = CreateFrame("Frame", nil, parent)
     panel.name = "Auto-roll"
     Options.autoRollPanel = panel
 
@@ -438,12 +446,7 @@ local function BuildAutoRoll()
     Text(panel, "or paste an item link (or its id) here and pick the answer:", 330, -100, "GameFontDisableSmall")
     local box = TextBox(panel, 334, -122, 290)
     widgets.autoBox = box
-    if rawget(_G, "hooksecurefunc") and rawget(_G, "ChatEdit_InsertLink") then
-        -- a shift-click on an item goes into this box while it has the focus
-        hooksecurefunc("ChatEdit_InsertLink", function(text)
-            if text and box:HasFocus() then box:Insert(text) end
-        end)
-    end
+    TakeLinks(box)
     local function Add(rollType)
         local text = box:GetText()
         local id = AR.ItemID(text)
@@ -515,48 +518,300 @@ local function BuildAutoRoll()
     return panel
 end
 
-local function RegisterPage(parentCategory, page)
-    if Settings.RegisterCanvasLayoutSubcategory then
-        return Settings.RegisterCanvasLayoutSubcategory(parentCategory, page, page.name)
+local WATCH_ROWS = 10  -- watched items shown at once; the mouse wheel scrolls the rest
+
+-- The page of the watchlist: items to be reminded of, each with an optional note.
+local function BuildWatchlist(parent)
+    local WL, AR = CL.Watchlist, CL.AutoRoll
+    local panel = CreateFrame("Frame", nil, parent)
+    panel.name = "Watchlist"
+    Options.watchPanel = panel
+
+    Text(panel, "Watchlist", 16, -16, "GameFontNormalLarge")
+    Text(panel, "Items you want to be reminded of. When one drops, its roll frame pulses.", 16, -44, "GameFontDisableSmall")
+    widgets.watchOn = Checkbox(panel, "Highlight watched items on the roll frames", 16, -72,
+        function() return CL.db.watchEnabled end,
+        function(v)
+            CL.db.watchEnabled = v
+            CL.RollFrames.RefreshWatch()
+        end)
+
+    Text(panel, "Add an item", 16, -116, "GameFontNormalLarge")
+    Text(panel, "Paste an item link (shift-click it here) or its id:", 16, -144, "GameFontDisableSmall")
+    local box = TextBox(panel, 20, -164, 290)
+    widgets.watchBox = box
+    Text(panel, "A note for yourself (optional):", 16, -196, "GameFontDisableSmall")
+    local noteBox = TextBox(panel, 20, -216, 290)
+    noteBox:SetMaxLetters(WL.MAX_NOTE)
+    widgets.watchNoteBox = noteBox
+    TakeLinks(box)
+    widgets.watchAdd = PushButton(panel, "Add to the watchlist", 20, -248, 170, function()
+        local text = box:GetText()
+        local id = WL.ItemID(text)
+        if not id then
+            CL.Print("paste an item link, or type an item id.")
+            return
+        end
+        local note = noteBox:GetText()
+        WL.Add(id, AR.NameOf(id, text), note ~= "" and note or nil)
+        box:SetText("")
+        noteBox:SetText("")
+        box:ClearFocus()
+        noteBox:ClearFocus()
+    end)
+    Text(panel, "The same from the chat:", 16, -300, "GameFontDisableSmall")
+    Text(panel, "/cll watch [item] [note]", 16, -318, "GameFontDisableSmall")
+    Text(panel, "/cll watch note [item] <text>", 16, -336, "GameFontDisableSmall")
+    Text(panel, "/cll watch remove [item]   /cll watch list", 16, -354, "GameFontDisableSmall")
+    Text(panel, "/cll sim always drops one watched item, to try it.", 16, -388, "GameFontDisableSmall")
+
+    Text(panel, "Watched items", 330, -56, "GameFontNormalLarge")
+    local list = CreateFrame("Frame", nil, panel)
+    list:SetPoint("TOPLEFT", panel, "TOPLEFT", 330, -90)
+    list:SetSize(300, WATCH_ROWS * 26)
+    list:EnableMouseWheel(true)
+    local offset = 0
+    local rows = {}
+    for i = 1, WATCH_ROWS do
+        local y = -(i - 1) * 26
+        local row = {}
+        row.name = Text(list, "", 4, y - 5, "GameFontHighlightSmall")
+        row.name:SetWidth(120)
+        row.name:SetWordWrap(false)
+        row.note = TextBox(list, 128, y, 134)
+        row.note:SetMaxLetters(WL.MAX_NOTE)
+        row.note:SetScript("OnEditFocusLost", function(self)
+            if row.id then WL.SetNote(row.id, self:GetText()) end
+        end)
+        row.remove = PushButton(list, "X", 266, y, 28, function()
+            if row.id then WL.Remove(row.id) end
+        end)
+        rows[i] = row
     end
-    local category = Settings.RegisterCanvasLayoutCategory(page, "CleanLoot: " .. page.name)
-    Settings.RegisterAddOnCategory(category)
-    return category
+    local count = Text(panel, "", 330, -90 - WATCH_ROWS * 26 - 6, "GameFontDisableSmall")
+    list.Sync = function()
+        local items = WL.List()
+        local maxOffset = math.max(0, #items - WATCH_ROWS)
+        if offset > maxOffset then offset = maxOffset end
+        for i, row in ipairs(rows) do
+            local item = items[i + offset]
+            if item then
+                row.id = item.id
+                row.name:SetText(item.name)
+                row.note:SetText(item.note)
+                row.name:Show() row.note:Show() row.remove:Show()
+            else
+                row.id = nil
+                row.name:SetText("")
+                row.note:SetText("")
+                row.name:Hide() row.note:Hide() row.remove:Hide()
+            end
+        end
+        if #items == 0 then
+            count:SetText("Nothing watched yet.")
+        elseif #items > WATCH_ROWS then
+            count:SetText(("%d items, scroll for more. Type in a note to change it."):format(#items))
+        else
+            count:SetText(("%d item%s. Type in a note to change it."):format(#items, #items == 1 and "" or "s"))
+        end
+    end
+    list:SetScript("OnMouseWheel", function(_, delta)
+        offset = math.max(0, offset - delta)
+        list.Sync()
+    end)
+    widgets.watchList = list
+
+    panel:SetScript("OnShow", Options.Refresh)
+    return panel
+end
+
+-------------------------------------------------
+-- The window
+-------------------------------------------------
+-- CleanLoot has a window of its own, not a page in the game's settings: that one is modal,
+-- so nothing else (the bags, the Dungeon Journal, a chat link to shift-click) could stay
+-- open beside it. This one is a plain movable frame; Esc closes it like any other.
+local WINDOW_W, WINDOW_H = 680, 640
+
+local PAGES = {
+    { key = "general",    label = "General",         width = 90,  build = Build },
+    { key = "controller", label = "Controller mode", width = 130, build = BuildController },
+    { key = "auto",       label = "Auto-roll",       width = 90,  build = BuildAutoRoll },
+    { key = "watch",      label = "Watchlist",       width = 90,  build = BuildWatchlist },
+}
+Options.pages = {}   -- key -> { panel =, tab = }
+
+local function Fill(frame, r, g, b, a, layer)
+    local t = frame:CreateTexture(nil, layer or "BACKGROUND")
+    t:SetAllPoints()
+    t:SetColorTexture(r, g, b, a)
+    return t
+end
+
+local function Border(frame, r, g, b, a)
+    local function edge(from, to, width, height)
+        local t = frame:CreateTexture(nil, "BORDER")
+        t:SetColorTexture(r, g, b, a)
+        t:SetPoint(from)
+        t:SetPoint(to)
+        if width then t:SetWidth(width) else t:SetHeight(height) end
+    end
+    edge("TOPLEFT", "TOPRIGHT", nil, 1)
+    edge("BOTTOMLEFT", "BOTTOMRIGHT", nil, 1)
+    edge("TOPLEFT", "BOTTOMLEFT", 1)
+    edge("TOPRIGHT", "BOTTOMRIGHT", 1)
+end
+
+local function SelectPage(key)
+    for _, def in ipairs(PAGES) do
+        local page = Options.pages[def.key]
+        local on = def.key == key
+        if on then page.panel:Show() else page.panel:Hide() end
+        page.tab.bg:SetColorTexture(on and 0.2 or 0.1, on and 0.18 or 0.1, on and 0.1 or 0.12, 1)
+        page.tab.label:SetTextColor(on and 1 or 0.65, on and 0.82 or 0.65, on and 0 or 0.65)
+        if on then page.tab.line:Show() else page.tab.line:Hide() end
+    end
+    Options.current = key
+end
+
+function Options.CurrentPage() return Options.current end
+
+local function SavePosition(frame)
+    local point, _, relPoint, x, y = frame:GetPoint()
+    if point then CL.db.optionsPoint = { point, relPoint, x, y } end
+end
+
+local function CreateWindow()
+    local f = CreateFrame("Frame", "CleanLootOptions", UIParent)
+    Options.window = f
+    f:SetSize(WINDOW_W, WINDOW_H)
+    f:SetFrameStrata("HIGH")
+    f:SetToplevel(true)
+    f:SetClampedToScreen(true)
+    f:EnableMouse(true)
+    f:SetMovable(true)
+    f:RegisterForDrag("LeftButton")
+    f:SetScript("OnDragStart", function(self) self:StartMoving() end)
+    f:SetScript("OnDragStop", function(self)
+        self:StopMovingOrSizing()
+        SavePosition(self)
+    end)
+    local p = CL.db.optionsPoint
+    if type(p) == "table" and p[1] then
+        f:SetPoint(p[1], UIParent, p[2] or p[1], p[3] or 0, p[4] or 0)
+    else
+        f:SetPoint("CENTER", UIParent, "CENTER", 0, 20)
+    end
+    -- a small screen: shrink the window to fit
+    local screen = UIParent:GetHeight()
+    if type(screen) == "number" and screen > 0 and screen < WINDOW_H + 60 then
+        f:SetScale(math.max(0.6, (screen - 60) / WINDOW_H))
+    end
+    Fill(f, 0.06, 0.06, 0.08, 0.97)
+    Border(f, 0.4, 0.33, 0.12, 1)
+
+    Text(f, "CleanLoot", 16, -10, "GameFontNormalLarge")
+    Text(f, "v" .. CL.Version(), 112, -15, "GameFontDisableSmall")
+
+    local close = CreateFrame("Button", nil, f)
+    close:SetSize(24, 24)
+    close:SetPoint("TOPRIGHT", f, "TOPRIGHT", -6, -6)
+    local x = close:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+    x:SetPoint("CENTER")
+    x:SetText("X")
+    close:SetScript("OnClick", function() f:Hide() end)
+    f.close = close
+
+    local content = CreateFrame("Frame", nil, f)
+    content:SetPoint("TOPLEFT", f, "TOPLEFT", 10, -66)
+    content:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -10, 10)
+    f.content = content
+
+    local x0 = 10
+    for _, def in ipairs(PAGES) do
+        local tab = CreateFrame("Button", nil, f)
+        tab:SetSize(def.width, 24)
+        tab:SetPoint("TOPLEFT", f, "TOPLEFT", x0, -36)
+        x0 = x0 + def.width + 4
+        tab.bg = Fill(tab, 0.1, 0.1, 0.12, 1)
+        tab.line = tab:CreateTexture(nil, "ARTWORK")
+        tab.line:SetColorTexture(0.9, 0.75, 0.2, 1)
+        tab.line:SetPoint("BOTTOMLEFT")
+        tab.line:SetPoint("BOTTOMRIGHT")
+        tab.line:SetHeight(2)
+        tab.label = tab:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+        tab.label:SetPoint("CENTER")
+        tab.label:SetText(def.label)
+        tab:SetScript("OnClick", function() SelectPage(def.key) end)
+
+        local panel = def.build(content)
+        panel:SetAllPoints(content)
+        panel:Hide()
+        Options.pages[def.key] = { panel = panel, tab = tab }
+    end
+    SelectPage("general")
+
+    -- Esc closes it, like the game's own windows
+    if type(UISpecialFrames) == "table" then
+        table.insert(UISpecialFrames, "CleanLootOptions")
+    end
+    f:Hide()
+    return f
+end
+
+-- The game's own settings keep a page, so the addon stays listed there: it points at the window.
+local function CloseGameSettings()
+    local panel = rawget(_G, "SettingsPanel")
+    if panel and panel.Close then pcall(panel.Close, panel) end
+end
+
+local function BuildSettingsPage()
+    local panel = CreateFrame("Frame")
+    panel.name = "CleanLoot"
+    Options.settingsPanel = panel
+    Text(panel, "CleanLoot", 16, -16, "GameFontNormalLarge")
+    Text(panel, "v" .. CL.Version(), 110, -20, "GameFontDisableSmall")
+    Text(panel, "CleanLoot has a window of its own, so the bags, the journal or the chat", 16, -56, "GameFontHighlightSmall")
+    Text(panel, "can stay open beside it. Open it with /cll, a right-click on the minimap", 16, -74, "GameFontHighlightSmall")
+    Text(panel, "button, or this button:", 16, -92, "GameFontHighlightSmall")
+    widgets.settingsOpen = PushButton(panel, "Open CleanLoot options", 20, -122, 190, function()
+        CloseGameSettings()
+        Options.Open()
+    end)
+    return panel
 end
 
 function Options.Setup()
-    if not (Settings and Settings.RegisterCanvasLayoutCategory and Settings.RegisterAddOnCategory) then return end
-    local panel = Build()
-    local category = Settings.RegisterCanvasLayoutCategory(panel, panel.name)
-    Settings.RegisterAddOnCategory(category)
-    Options.category = category
-
-    -- controller mode and auto-roll get a page of their own, listed under CleanLoot
-    Options.controllerCategory = RegisterPage(category, BuildController())
-    Options.autoRollCategory = RegisterPage(category, BuildAutoRoll())
+    CreateWindow()
+    if Settings and Settings.RegisterCanvasLayoutCategory and Settings.RegisterAddOnCategory then
+        local panel = BuildSettingsPage()
+        local category = Settings.RegisterCanvasLayoutCategory(panel, panel.name)
+        Settings.RegisterAddOnCategory(category)
+        Options.category = category
+    end
     Options.Refresh()
 end
 
-local function OpenCategory(category)
-    if InCombatLockdown and InCombatLockdown() then
-        CL.Print("the options cannot be opened during combat.")
+-- Opens the window (on a page when one is named: "general", "controller", "auto", "watch").
+function Options.Open(key)
+    if not Options.window then
+        CL.Print("the options window is not available.")
         return
     end
-    if not (category and Settings and Settings.OpenToCategory) then
-        CL.Print("the options panel is not available.")
-        return
+    if key and Options.pages[key] then SelectPage(key) end
+    Options.window:Show()
+    Options.Refresh()
+end
+
+-- /cll and the minimap button: open it, or close it when it is already open.
+function Options.Toggle()
+    if Options.window and Options.window:IsShown() then
+        Options.window:Hide()
+    else
+        Options.Open()
     end
-    Settings.OpenToCategory(category.GetID and category:GetID() or category.ID)
 end
 
-function Options.Open()
-    OpenCategory(Options.category)
-end
-
-function Options.OpenController()
-    OpenCategory(Options.controllerCategory)
-end
-
-function Options.OpenAutoRoll()
-    OpenCategory(Options.autoRollCategory)
-end
+function Options.OpenController() Options.Open("controller") end
+function Options.OpenAutoRoll() Options.Open("auto") end
+function Options.OpenWatchlist() Options.Open("watch") end

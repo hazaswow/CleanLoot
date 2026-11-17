@@ -40,7 +40,7 @@ function Button.Setup()
         icon = "Interface\\AddOns\\CleanLoot\\Media\\Logo",
         OnClick = function(_, button)
             if button == "RightButton" then
-                CL.Options.Open()
+                CL.Options.Toggle()
             elseif IsShiftKeyDown() then
                 CL.Sim.Start(3)
             else
@@ -50,7 +50,7 @@ function Button.Setup()
         OnTooltipShow = function(tooltip)
             tooltip:AddLine(("CleanLoot v%s"):format(CL.Version()))
             tooltip:AddLine("Left-click: loot history", 1, 1, 1)
-            tooltip:AddLine("Right-click: options", 1, 1, 1)
+            tooltip:AddLine("Right-click: options window", 1, 1, 1)
             tooltip:AddLine("Shift-click: simulate drops", 0.6, 0.6, 0.6)
         end,
     }) or ldb:GetDataObjectByName(BUTTON_NAME)
