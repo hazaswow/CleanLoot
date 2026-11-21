@@ -642,13 +642,35 @@ function ML.OnComplete(key)
         if handled[key] or not ML.IsMasterLoot() then return end
         local res = CL.API.GetResult(key)
         if not res or res.winner or res.allPassed then return end   -- the game named one: Results shows it
-        handled[key] = true
+        handled[key] = #res.rolls > 0 and true or "empty"   -- "empty": nobody had rolled yet, a later update may bring rolls
         CL.Results.Close(key)   -- nobody is waited for any more
         if not CL.db.masterWindow then return end
         CL.Debug("master loot: rolls over for %s, %d roll(s)", tostring(res.name), #res.rolls)
         if #res.rolls > 0 then ML.Show(res) end
         ML.MaybeAskGargul()
     end)
+end
+
+-- LOOT_HISTORY_UPDATE_DROP: a roll that landed after the window opened (or after "complete")
+-- joins the window; one that had no rolls yet gets its window now.
+function ML.OnDropUpdate(key)
+    key = CL.Plain(key)
+    if key == nil or not handled[key] then return end
+    local res = CL.API.GetResult(key)
+    if not res or res.winner then return end
+    for _, win in ipairs(active) do
+        if win.res.key == key and not win.simulated then
+            if not win.given then
+                win.res = res
+                ML.Refresh(win)
+            end
+            return
+        end
+    end
+    if handled[key] == "empty" and #res.rolls > 0 and CL.db.masterWindow and ML.IsMasterLoot() then
+        handled[key] = true
+        ML.Show(res)
+    end
 end
 
 -- /cll sim master: a result window with a made-up group, to see it and try the click.

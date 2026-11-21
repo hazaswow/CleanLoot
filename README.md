@@ -28,7 +28,7 @@ Clean loot roll frames for **WoW Forever** (the official Blizzard beta client). 
 ## Installation
 
 - **CurseForge / WoW addon manager**: install *CleanLoot* for WoW Forever.
-- **Manual**: download the zip from the [releases](https://github.com/hazaswow/CleanLoot/releases) and extract the `CleanLoot` folder into the `Interface/AddOns` folder of your WoW Forever install (`_classic_beta_` during the beta). The folder must be named exactly `CleanLoot` and contain `Libs/`.
+- **Manual**: download the zip from the [releases](https://github.com/hazaswow/CleanLoot/releases) and extract the `CleanLoot` folder into the `Interface/AddOns` folder of your WoW Forever install (the `_forever_` folder). The folder must be named exactly `CleanLoot` and contain `Libs/`.
 
 ## Commands
 

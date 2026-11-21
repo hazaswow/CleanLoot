@@ -524,6 +524,10 @@ watcher:SetScript("OnEvent", function(_, event, arg1, arg2, arg3)
         -- the result of a finished roll lands in the history just after the "complete" event
         local ok, err = pcall(CL.Results.OnDropUpdate, arg2)
         if not ok then CL.Print("LOOT_HISTORY_UPDATE_DROP (result): " .. tostring(err)) end
+        if CL.MasterLoot then   -- master loot: a late roll joins the open result window
+            ok, err = pcall(CL.MasterLoot.OnDropUpdate, arg2)
+            if not ok then CL.Print("LOOT_HISTORY_UPDATE_DROP (master loot): " .. tostring(err)) end
+        end
     elseif event == "CONFIRM_LOOT_ROLL" then
         -- (rollID, rollType): the game asks to confirm a roll that binds the item. Left
         -- alone, its own prompt shows and the roll frame stays until the game closes the

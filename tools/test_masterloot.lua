@@ -292,6 +292,40 @@ CL.Options.widgets.masterWindow.__scripts.OnClick(CL.Options.widgets.masterWindo
 check(CL.db.masterWindow == false, "the window option can be switched off")
 CL.db.masterWindow = true
 
+-- 11b. A roll that lands after the window opened joins it
+reset()
+Drop(7300, { Entry("Teki La", "PRIEST", 3, 44), Entry("Iso Tope", "MAGE", 3, 14) })
+over(7300)
+win = ML.Windows()[1]
+local function rowCount(w) local n = 0 for _, r in ipairs(w.rows) do if r.entry then n = n + 1 end end return n end
+check(rowCount(win) == 2, "the window opens with the rolls known at the end")
+WOW.drops[7300].rollInfos[#WOW.drops[7300].rollInfos + 1] = Entry("Humark Clearsight", "HUNTER", 3, 91)
+WOW.FireEvent("LOOT_HISTORY_UPDATE_DROP", 0, 7300)
+check(rowCount(win) == 3 and win.rows[1].who:GetText() == "Humark Clearsight", "a late roll joins the window, and takes the top (" .. tostring(win.rows[1].who:GetText()) .. ")")
+check(#ML.Windows() == 1, "...in the same window")
+win.rows[1].__scripts.OnClick(win.rows[1])
+ML.Confirm().give.__scripts.OnClick(ML.Confirm().give)
+WOW.FireEvent("LOOT_SLOT_CLEARED", 1)
+WOW.drops[7300].rollInfos[#WOW.drops[7300].rollInfos + 1] = Entry("Late Comer", "DRUID", 3, 99)
+WOW.FireEvent("LOOT_HISTORY_UPDATE_DROP", 0, 7300)
+check(rowCount(win) == 3 and win.given, "once the item is given the window no longer changes")
+
+-- nobody had rolled when the roll ended: the window comes when the first roll does
+reset()
+Drop(7301, { Entry("Teki La", "PRIEST", 4), Entry("Iso Tope", "MAGE", 4) })
+over(7301)
+check(#ML.Windows() == 0, "nobody rolled at the end: no window yet")
+WOW.drops[7301].rollInfos[1].state, WOW.drops[7301].rollInfos[1].roll = 3, 55
+WOW.FireEvent("LOOT_HISTORY_UPDATE_DROP", 0, 7301)
+check(#ML.Windows() == 1 and rowCount(ML.Windows()[1]) == 1, "...it opens when a roll arrives")
+WOW.FireEvent("LOOT_HISTORY_UPDATE_DROP", 0, 7301)
+check(#ML.Windows() == 1, "...once")
+-- an update for a roll we never handled does nothing
+Drop(7302, { Entry("Teki La", "PRIEST", 3, 10) })
+WOW.FireEvent("LOOT_HISTORY_UPDATE_DROP", 0, 7302)
+check(#ML.Windows() == 1, "a history update for another roll opens nothing")
+reset()
+
 -- 12. Gargul also announces hand-outs: ask once which one keeps doing it
 local function fakeGargul(on)
     local g = { Settings = { values = { ["AwardingLoot.awardMessagesEnabled"] = on }, setCalls = 0 } }
