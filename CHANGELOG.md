@@ -7,6 +7,7 @@
 - **The master looter can click a name to give that player the item.** A small confirmation opens at the mouse; on *Give* the item is handed out from the boss's open loot window, and once the game confirms it the group is told in the chat, in /p (or /ra in a raid): `[CleanLoot] [item] given to Name for roll Greed 44`. If the game refuses (full bags, too far away, the loot window closed) nothing is announced and you are told why.
 - The "Waiting on rolls" card no longer stays up after a master-loot roll is over.
 - The whole master-loot part has its own switch (*General* tab, or `/cll master on|off`): off, it watches and announces nothing, and the rest of CleanLoot is untouched. Two more options under it: show the window, and announce the hand-outs in the chat (all on). If **Gargul** is installed, which also announces what you award, CleanLoot asks the master looter once whether to keep both, turn off CleanLoot's master loot features or turn off Gargul's *Award messages* (`/cll gargul` asks again; so does the button on the General tab). `/cll sim master` opens a made-up window to look at it and try the click.
+- Honest note: the roll window is built from real master-loot data, but handing an item out through the loot window and the chat announcement have not been tried in a real group yet. If something misbehaves, `/cll debug on` and tell me what you see.
 
 ## 1.5.0
 
