@@ -267,6 +267,13 @@ local function Build(parent)
     widgets.masterAnnounce = Checkbox(panel, "Announce hand-outs in /p or /ra", 16, -480,
         function() return CL.db.masterAnnounce end,
         function(v) CL.db.masterAnnounce = v end)
+    -- only when Gargul is installed: both would announce the same hand-out
+    widgets.gargulAsk = PushButton(panel, "Gargul: who announces?", 150, -430, 170, function()
+        CL.MasterLoot.AskGargul(true)
+    end)
+    widgets.gargulAsk.Sync = function()
+        if CL.MasterLoot.GargulAnnounces() ~= nil then widgets.gargulAsk:Show() else widgets.gargulAsk:Hide() end
+    end
 
     -- second column, beside the short rows of the first
     Text(panel, "Loot toasts", 330, -56, "GameFontNormalLarge")

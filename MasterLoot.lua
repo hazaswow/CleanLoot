@@ -201,7 +201,16 @@ end
 local events = CreateFrame("Frame")
 events:RegisterEvent("LOOT_SLOT_CLEARED")
 events:RegisterEvent("CHAT_MSG_LOOT")
+events:RegisterEvent("PARTY_LOOT_METHOD_CHANGED")
+events:RegisterEvent("PLAYER_ENTERING_WORLD")
 events:SetScript("OnEvent", function(_, event, arg1)
+    if event == "PARTY_LOOT_METHOD_CHANGED" or event == "PLAYER_ENTERING_WORLD" then
+        -- Gargul is loaded after us and sets up late: look a few seconds after
+        C_Timer.After(event == "PLAYER_ENTERING_WORLD" and 6 or 1.5, function()
+            if CL.db and ML.MaybeAskGargul then ML.MaybeAskGargul() end
+        end)
+        return
+    end
     if not pending then return end
     if event == "LOOT_SLOT_CLEARED" then
         if arg1 == pending.slot then Confirmed() end
@@ -501,6 +510,125 @@ function ML.Show(res, simulated)
 end
 
 -------------------------------------------------
+-- Gargul announces hand-outs too
+-------------------------------------------------
+-- Gargul (the master-loot addon) posts "item awarded to X" in /ra or /p as well. With both
+-- on, every hand-out is announced twice, so once, as master looter, CleanLoot asks which
+-- one should keep doing it. Gargul's setting is read and set through the Gargul object it
+-- opens to other addons (Gargul.Settings:get / :set).
+local GARGUL_SETTING = "AwardingLoot.awardMessagesEnabled"
+
+local function GargulObject()
+    local g = rawget(_G, "Gargul")
+    if type(g) == "table" and type(g.Settings) == "table" and type(g.Settings.get) == "function" then return g end
+    return nil
+end
+
+-- nil: Gargul is not installed. Otherwise whether its award messages are on.
+function ML.GargulAnnounces()
+    local g = GargulObject()
+    if not g then return nil end
+    local ok, value = pcall(g.Settings.get, g.Settings, GARGUL_SETTING)
+    if not ok then return true end   -- installed but unreadable: its default is on
+    return value ~= false
+end
+
+-- Both would announce the same hand-out.
+function ML.GargulConflict()
+    return CL.db.masterAnnounce == true and ML.GargulAnnounces() == true
+end
+
+local gargulBox
+
+local function CreateGargulBox()
+    local f = CreateFrame("Frame", "CleanLootGargulChoice", UIParent, "BackdropTemplate")
+    f:SetSize(380, 214)
+    f:SetPoint("CENTER", UIParent, "CENTER", 0, 80)
+    f:SetFrameStrata("FULLSCREEN_DIALOG")
+    f:SetToplevel(true)
+    f:SetClampedToScreen(true)
+    f:EnableMouse(true)
+    f:SetBackdrop(BACKDROP)
+    f:SetBackdropColor(0.06, 0.06, 0.08, 0.98)
+    f:SetBackdropBorderColor(0.9, 0.75, 0.2, 1)
+
+    f.title = f:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+    f.title:SetPoint("TOP", f, "TOP", 0, -12)
+    f.title:SetText("CleanLoot and Gargul")
+    f.text = f:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+    f.text:SetPoint("TOP", f, "TOP", 0, -38)
+    f.text:SetWidth(340)
+    f.text:SetJustifyH("CENTER")
+    f.text:SetText("Gargul is installed and announces the items you hand out in the chat, as CleanLoot does: "
+        .. "each hand-out would be announced twice. What do you prefer?")
+
+    local function Choice(label, y, onClick)
+        local b = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+        b:SetSize(320, 24)
+        b:SetPoint("TOP", f, "TOP", 0, y)
+        b:SetText(label)
+        b:SetScript("OnClick", function()
+            CL.db.gargulAsked = true
+            f:Hide()
+            onClick()
+            if CL.Options and CL.Options.Refresh then CL.Options.Refresh() end
+        end)
+        return b
+    end
+    f.both = Choice("Keep both", -98, function()
+        CL.Print("both keep announcing the hand-outs.")
+    end)
+    f.mine = Choice("Turn off CleanLoot's announcements", -128, function()
+        CL.db.masterAnnounce = false
+        CL.Print("CleanLoot no longer announces hand-outs (Gargul does).")
+    end)
+    f.theirs = Choice("Turn off Gargul's award messages", -158, function()
+        local g = GargulObject()
+        local ok = g and type(g.Settings.set) == "function" and pcall(g.Settings.set, g.Settings, GARGUL_SETTING, false)
+        if ok then
+            CL.Print("Gargul's award messages are off (CleanLoot announces the hand-outs).")
+        else
+            CL.Print("could not change Gargul's setting: turn off its Award messages in its settings (Awarding loot).")
+        end
+    end)
+    f.note = f:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+    f.note:SetPoint("BOTTOM", f, "BOTTOM", 0, 10)
+    f.note:SetText("Ask again later with /cll gargul.")
+
+    if type(UISpecialFrames) == "table" then table.insert(UISpecialFrames, "CleanLootGargulChoice") end
+    f:Hide()
+    return f
+end
+
+function ML.GargulBox() return gargulBox end
+
+-- `force` (/cll gargul, the options button): ask even when it was answered before.
+function ML.AskGargul(force)
+    if ML.GargulAnnounces() == nil then
+        if force then CL.Print("Gargul is not installed (or not loaded).") end
+        return false
+    end
+    if not ML.GargulConflict() then
+        if force then
+            CL.Print(("Gargul's award messages are %s, CleanLoot's announcements are %s: nothing is announced twice."):format(
+                ML.GargulAnnounces() and "on" or "off", CL.db.masterAnnounce and "on" or "off"))
+        end
+        return false
+    end
+    if not force and CL.db.gargulAsked then return false end
+    gargulBox = gargulBox or CreateGargulBox()
+    gargulBox:Show()
+    return true
+end
+
+-- Asked once, to the master looter, and not in the middle of a fight.
+function ML.MaybeAskGargul()
+    if CL.db.gargulAsked or not ML.IsMasterLooter() then return false end
+    if type(InCombatLockdown) == "function" and InCombatLockdown() == true then return false end
+    return ML.AskGargul(false)
+end
+
+-------------------------------------------------
 -- When the rolls are over
 -------------------------------------------------
 local handled = {}   -- lootListKey -> true: its window was opened (or there was nothing to show)
@@ -519,6 +647,7 @@ function ML.OnComplete(key)
         if not CL.db.masterWindow then return end
         CL.Debug("master loot: rolls over for %s, %d roll(s)", tostring(res.name), #res.rolls)
         if #res.rolls > 0 then ML.Show(res) end
+        ML.MaybeAskGargul()
     end)
 end
 

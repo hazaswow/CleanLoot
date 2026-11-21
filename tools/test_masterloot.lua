@@ -292,6 +292,105 @@ CL.Options.widgets.masterWindow.__scripts.OnClick(CL.Options.widgets.masterWindo
 check(CL.db.masterWindow == false, "the window option can be switched off")
 CL.db.masterWindow = true
 
+-- 12. Gargul also announces hand-outs: ask once which one keeps doing it
+local function fakeGargul(on)
+    local g = { Settings = { values = { ["AwardingLoot.awardMessagesEnabled"] = on }, setCalls = 0 } }
+    function g.Settings:get(key) return self.values[key] end
+    function g.Settings:set(key, value) self.values[key] = value self.setCalls = self.setCalls + 1 return true end
+    return g
+end
+local function resetGargul()
+    reset()
+    Gargul = nil
+    CL.db.gargulAsked = nil
+    if ML.GargulBox() then ML.GargulBox():Hide() end
+end
+
+resetGargul()
+check(ML.GargulAnnounces() == nil and not ML.AskGargul(false), "no Gargul: nothing to ask")
+SlashCmdList.CLEANLOOT("gargul")
+check(sayMatches("Gargul is not installed"), "/cll gargul says so when it is not there")
+
+resetGargul()
+Gargul = fakeGargul(true)
+check(ML.GargulAnnounces() == true and ML.GargulConflict(), "Gargul with its award messages on, and ours on: a conflict")
+check(ML.MaybeAskGargul() == true and ML.GargulBox():IsShown(), "the master looter is asked")
+local gb = ML.GargulBox()
+gb.both.__scripts.OnClick(gb.both)
+check(not gb:IsShown() and CL.db.gargulAsked and CL.db.masterAnnounce and Gargul.Settings.values["AwardingLoot.awardMessagesEnabled"] == true,
+    "Keep both changes nothing")
+check(ML.MaybeAskGargul() == false and not gb:IsShown(), "...and it is not asked again")
+SlashCmdList.CLEANLOOT("gargul")
+check(gb:IsShown(), "/cll gargul asks again whenever you want")
+gb:Hide()
+
+resetGargul()
+Gargul = fakeGargul(true)
+ML.MaybeAskGargul()
+gb = ML.GargulBox()
+gb.mine.__scripts.OnClick(gb.mine)
+check(CL.db.masterAnnounce == false and Gargul.Settings.values["AwardingLoot.awardMessagesEnabled"] == true and Gargul.Settings.setCalls == 0,
+    "Turn off CleanLoot's: only our option goes off, Gargul is not touched")
+check(not ML.GargulConflict(), "...and there is no conflict any more")
+CL.db.masterAnnounce = true
+
+resetGargul()
+Gargul = fakeGargul(true)
+ML.MaybeAskGargul()
+gb = ML.GargulBox()
+gb.theirs.__scripts.OnClick(gb.theirs)
+check(Gargul.Settings.values["AwardingLoot.awardMessagesEnabled"] == false and CL.db.masterAnnounce == true,
+    "Turn off Gargul's: its Award messages go off, ours stay on")
+check(not ML.GargulConflict(), "...and there is no conflict any more")
+
+-- when it is not asked
+resetGargul()
+Gargul = fakeGargul(false)
+check(not ML.MaybeAskGargul(), "Gargul's award messages already off: nothing to ask")
+resetGargul()
+Gargul = fakeGargul(true)
+CL.db.masterAnnounce = false
+check(not ML.MaybeAskGargul(), "our announcements off: nothing to ask")
+SlashCmdList.CLEANLOOT("gargul")
+check(sayMatches("nothing is announced twice") and not ML.GargulBox():IsShown(), "...and /cll gargul explains the state instead")
+resetGargul()
+Gargul = fakeGargul(true)
+masterParty = 2
+check(not ML.MaybeAskGargul(), "not the master looter: not asked")
+masterParty = 0
+function InCombatLockdown() return true end
+check(not ML.MaybeAskGargul(), "in combat: not asked")
+function InCombatLockdown() return false end
+check(ML.MaybeAskGargul(), "...out of combat it is")
+ML.GargulBox():Hide()
+
+-- the triggers
+resetGargul()
+Gargul = fakeGargul(true)
+WOW.FireEvent("PARTY_LOOT_METHOD_CHANGED")
+WOW.Advance(2)
+check(ML.GargulBox() and ML.GargulBox():IsShown(), "becoming master looter asks (a moment after the change)")
+ML.GargulBox():Hide()
+resetGargul()
+Gargul = fakeGargul(true)
+Standard(7200)
+over(7200)
+check(ML.GargulBox() and ML.GargulBox():IsShown(), "so does the first roll result window as master looter")
+ML.GargulBox():Hide()
+
+-- the options button only shows when Gargul is there
+resetGargul()
+CL.Options.Refresh()
+check(not CL.Options.widgets.gargulAsk:IsShown(), "no Gargul: no button on the General tab")
+Gargul = fakeGargul(true)
+CL.Options.Refresh()
+check(CL.Options.widgets.gargulAsk:IsShown(), "Gargul installed: the button is there")
+CL.Options.widgets.gargulAsk.__scripts.OnClick(CL.Options.widgets.gargulAsk)
+check(ML.GargulBox():IsShown(), "...and asks")
+ML.GargulBox():Hide()
+Gargul = nil
+CL.db.gargulAsked = nil
+
 print = realPrint
 io.write(("%d checks, %d failed\n"):format(checks, failures))
 os.exit(failures == 0 and 0 or 1)

@@ -12,6 +12,7 @@ local HELP = {
     "/cll sim [n]       simulate n loot rolls (1-8) with a fake group",
     "/cll sim colors    one simulated drop of every colour",
     "/cll sim master    a simulated master-loot roll result window",
+    "/cll gargul        choose who announces the hand-outs when Gargul is installed",
     "/cll sim group <n> other players in the simulated group (1-39, default 4)",
     "/cll sim clear     remove the simulated rolls",
     "/cll restore       bring back rolls still running (automatic at login and /reload)",
@@ -53,6 +54,8 @@ SlashCmdList["CLEANLOOT"] = function(msg)
         else
             CL.Sim.Start(tonumber(sub) or 1)
         end
+    elseif cmd == "gargul" then
+        CL.MasterLoot.AskGargul(true)
     elseif cmd == "debug" then
         if rest == "on" then CL.db.debug = true
         elseif rest == "off" then CL.db.debug = false
