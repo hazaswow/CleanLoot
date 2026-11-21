@@ -101,14 +101,18 @@ local function SameName(a, b)
 end
 
 -- The item as the chat takes it: the classic coloured link, built from the item string.
-local function ChatLink(res)
-    local link = res.link
+local function ChatLinkOf(link, fallbackName, quality)
     local itemString = type(link) == "string" and link:match("|H(item:[^|]+)|h")
-    local name = type(link) == "string" and link:match("|h%[(.-)%]|h") or res.name
-    if not (itemString and name) then return res.name or "?" end
-    local r, g, b = CL.QualityColor(res.quality)
+    local name = type(link) == "string" and link:match("|h%[(.-)%]|h") or fallbackName
+    if not (itemString and name) then return fallbackName or "?" end
+    local r, g, b = CL.QualityColor(quality)
     return ("|cff%02x%02x%02x|H%s|h[%s]|h|r"):format(math.floor(r * 255 + 0.5), math.floor(g * 255 + 0.5),
         math.floor(b * 255 + 0.5), itemString, name)
+end
+ML.ChatLink = ChatLinkOf
+
+local function ChatLink(res)
+    return ChatLinkOf(res.link, res.name, res.quality)
 end
 
 local function RollWord(entry)
@@ -132,18 +136,58 @@ local function FindSlot(link)
     return nil
 end
 
+-- The index of `name` in the loot window's list of players. The exact name wins; a first name
+-- ("Cline" for "Cline Gloomhaunt") only counts when it fits one player (two alts of the same
+-- first name must never be mixed up).
 local function FindCandidate(slot, name)
+    local wanted = Norm(name)
+    local exact, loose, looseCount = nil, nil, 0
     for index = 1, 40 do
         local candidate = GetMasterLootCandidate(slot, index)
-        if type(candidate) == "string" and SameName(candidate, name) then return index end
+        if type(candidate) == "string" then
+            if Norm(candidate) == wanted then
+                exact = exact or index
+            elseif SameName(candidate, name) then
+                loose = loose or index
+                looseCount = looseCount + 1
+            end
+        end
     end
+    if exact then return exact end
+    if looseCount == 1 then return loose end
+    return nil
+end
+ML.FindCandidate = FindCandidate
+
+-- Where the master looter's messages go: /ra in a raid (/rw instead when the option is on and
+-- you are allowed to), /p in a party, nowhere when alone.
+local function CanWarn()
+    return (type(UnitIsGroupLeader) == "function" and UnitIsGroupLeader("player") == true)
+        or (type(UnitIsGroupAssistant) == "function" and UnitIsGroupAssistant("player") == true)
+end
+
+function ML.Channel()
+    if type(IsInRaid) == "function" and IsInRaid() == true then
+        if CL.db.masterRaidWarning and CanWarn() then return "RAID_WARNING" end
+        return "RAID"
+    end
+    if type(IsInGroup) == "function" and IsInGroup() == true then return "PARTY" end
     return nil
 end
 
-local function Channel()
-    if type(IsInRaid) == "function" and IsInRaid() == true then return "RAID" end
-    if type(IsInGroup) == "function" and IsInGroup() == true then return "PARTY" end
-    return nil
+-- Say something to the group. Alone, it is only printed to you. Returns true when it was sent.
+function ML.Say(message)
+    local channel = ML.Channel()
+    if not channel then
+        print(message)
+        return false
+    end
+    local ok, err = pcall(SendChatMessage, message, channel)
+    if not ok then
+        CL.Print("could not send a message to the group: " .. tostring(err))
+        return false
+    end
+    return true
 end
 
 local pending   -- the hand-out the game has not confirmed yet: { win, entry, slot, token }
@@ -155,7 +199,7 @@ local function Done(win, entry)
     ML.Refresh(win)
     local short = entry.name:match("^([^%-]+)") or entry.name
     local message = ("[CleanLoot] %s given to %s for roll %s"):format(ChatLink(win.res), short, RollWord(entry))
-    local channel = (not win.simulated) and CL.db.masterAnnounce and Channel() or nil
+    local channel = (not win.simulated) and CL.db.masterAnnounce and ML.Channel() or nil
     if channel then
         local ok, err = pcall(SendChatMessage, message, channel)
         if not ok then CL.Print("could not announce it: " .. tostring(err)) end

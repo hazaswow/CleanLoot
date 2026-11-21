@@ -18,6 +18,7 @@ Clean loot roll frames for **WoW Forever** (the official Blizzard beta client). 
 - **Auto-roll** (nothing is automatic until you make a rule): always Need, Greed or Pass on an item you choose (right-click the button on its roll frame, or add it on the *Auto-roll* page), and optionally one answer for every green, blue, epic or legendary item. A rule only answers when the answer is possible; otherwise the roll stays yours
 - **Watchlist**: a list of items you want to be reminded of. When one drops, its roll frame gets a gently pulsing cyan outline, and the note you wrote for it shows on the frame. Nothing is answered for you
 - **Master loot**: when the rolls end, everyone in the group gets a *roll result* window for the item: every roll with the player's name, best first, ties flagged. The master looter clicks a name to give that player the item (a small confirmation opens at the mouse), and the group is told in /p (or /ra in a raid): `[CleanLoot] [item] given to Name for roll Greed 44`
+- **Taking the loot for later** (master looter): a *Take all* button under the loot window (or automatically, as an option) gives you every master-loot item of the window, and the group is told in the chat, one message per item. `/cll session` lists the items of your bags you can still hand out (the tradable bind-on-pickup ones with their time left, the unbound bind-on-equip ones), oldest first, each with a box to leave it out
 - **Blizzard's own roll frames are hidden** (and stop catching clicks). the options bring them back
 - **Less chat spam**: the per-roll lines (who selected what, roll values) are filtered out; **who won what** and your loot stay visible. Blizzard's *Loot Rolls* history window keeps everything
 - **Winner popup**: when a roll ends, a small card shows who won and with which roll, and always your own roll (rolled, passed or did not answer). Hover it for every roll of the drop; right-click closes it. It stacks downwards or upwards, as you choose. A small **Waiting on rolls** card opens the stack while a roll is still open; hover it for each item with how many players have not rolled, then their names (you included while you have not answered; an option turns it off). It stands in for the roll lines the chat filter hides
@@ -49,6 +50,8 @@ Clean loot roll frames for **WoW Forever** (the official Blizzard beta client). 
 | `/cll sim [n]` | Simulate *n* loot rolls (1-8) with a simulated group, to try the frames without a real drop. With a watchlist, the first drop is always one of the watched items |
 | `/cll sim colors` | One simulated drop of every item colour |
 | `/cll master [on\|off]` | Turn CleanLoot's master loot features on or off |
+| `/cll take` | Master looter: give yourself every master-loot item of the open loot window, to hand out later |
+| `/cll session` | Master looter: the items of your bags you can still hand out, with a box to leave each one out |
 | `/cll gargul` | With Gargul installed: choose who announces the hand-outs (both, CleanLoot only, or Gargul only) |
 | `/cll sim master` | A made-up master-loot roll result window, to look at it and try the click |
 | `/cll sim group <n>` | Size of the simulated group (1-39 other players) |

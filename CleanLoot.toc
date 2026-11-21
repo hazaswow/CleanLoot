@@ -23,6 +23,9 @@ Keyboard.lua
 Results.lua
 Sim.lua
 MasterLoot.lua
+LootPool.lua
+TakeAll.lua
+Session.lua
 Options.lua
 Minimap.lua
 ChatFilter.lua

@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.7.0 (in progress)
+
+**Master loot: taking the loot, and your tradable items**
+- A **Take all** button under the loot window gives you every master-loot item of the window (the ones at or above the game's loot threshold), to hand them out later. The group is told in the chat: one line saying CleanLoot takes the items for the master looter, then one message per item with its link. An option does it by itself when the loot window opens (hold Shift to skip it). `/cll take` does it from the keyboard.
+- CleanLoot now keeps a list of what you can still hand out: the bind-on-pickup items you may still trade (with the time left) and the bind-on-equip ones that are not bound yet. It only follows the master looter, and only reads a bag when something changed. `/cll session` opens the list, oldest first (the items about to become untradable come first, bind-on-equip ones last), every item offered by default, with a box to leave one out.
+- All the master looter's messages go to /ra in a raid and /p in a party. An option sends them to /rw instead when you lead or assist.
+- The master loot settings now have their own tab in the options window, with the switch, the roll results, taking the loot and the session list.
+- Safer hand-outs: a first name is only taken for a player when it fits one player in the loot window's list (two characters called Hazas can no longer be mixed up).
+- Not in yet: the timed roll session itself (the rolls from your bags, with the countdown) is the next step.
+
 ## 1.6.0
 
 **Master loot** (new)

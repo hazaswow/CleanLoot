@@ -270,24 +270,6 @@ local function Build(parent)
         function() return CL.db.minimap and CL.db.minimap.hide end,
         function(v) CL.MinimapButton.SetHidden(v) end)
 
-    Text(panel, "Master loot", 16, -432, "GameFontNormalLarge")
-    widgets.masterEnabled = Checkbox(panel, "Enable master loot features", 16, -456,
-        function() return CL.MasterLoot.Enabled() end,
-        function(v) CL.MasterLoot.SetEnabled(v) end)
-    widgets.masterWindow = DependsOnMaster(Checkbox(panel, "Show the roll results window", 40, -480,
-        function() return CL.db.masterWindow end,
-        function(v) CL.db.masterWindow = v end))
-    widgets.masterAnnounce = DependsOnMaster(Checkbox(panel, "Announce hand-outs in /p or /ra", 40, -504,
-        function() return CL.db.masterAnnounce end,
-        function(v) CL.db.masterAnnounce = v end))
-    -- only when Gargul is installed: both would announce the same hand-out
-    widgets.gargulAsk = PushButton(panel, "Gargul: who announces?", 150, -430, 170, function()
-        CL.MasterLoot.AskGargul(true)
-    end)
-    widgets.gargulAsk.Sync = function()
-        if CL.MasterLoot.GargulAnnounces() ~= nil then widgets.gargulAsk:Show() else widgets.gargulAsk:Hide() end
-    end
-
     -- second column, beside the short rows of the first
     Text(panel, "Loot toasts", 330, -56, "GameFontNormalLarge")
     Text(panel, "The \"You won\" banner Blizzard shows.", 330, -84, "GameFontDisableSmall")
@@ -653,6 +635,63 @@ local function BuildWatchlist(parent)
     return panel
 end
 
+-- The page of master loot: the switch, the roll results, taking the loot, the session.
+local function BuildMaster(parent)
+    local panel = CreateFrame("Frame", nil, parent)
+    panel.name = "Master loot"
+    Options.masterPanel = panel
+
+    Text(panel, "Master loot", 16, -16, "GameFontNormalLarge")
+    Text(panel, "For the master looter: the roll results, taking the loot, handing items out.", 16, -44, "GameFontDisableSmall")
+    widgets.masterEnabled = Checkbox(panel, "Enable master loot features", 16, -72,
+        function() return CL.MasterLoot.Enabled() end,
+        function(v) CL.MasterLoot.SetEnabled(v) end)
+
+    Text(panel, "Roll results", 16, -116, "GameFontNormalLarge")
+    widgets.masterWindow = DependsOnMaster(Checkbox(panel, "Show the roll results window", 16, -142,
+        function() return CL.db.masterWindow end,
+        function(v) CL.db.masterWindow = v end))
+    widgets.masterAnnounce = DependsOnMaster(Checkbox(panel, "Announce hand-outs in the chat", 16, -166,
+        function() return CL.db.masterAnnounce end,
+        function(v) CL.db.masterAnnounce = v end))
+    widgets.masterRaidWarning = DependsOnMaster(Checkbox(panel, "Use raid warning (/rw) instead of raid chat", 16, -190,
+        function() return CL.db.masterRaidWarning end,
+        function(v) CL.db.masterRaidWarning = v end))
+    Text(panel, "Messages go to /ra in a raid and /p in a party. /rw needs the lead or an assist.", 16, -220, "GameFontDisableSmall")
+
+    Text(panel, "Taking the loot", 16, -262, "GameFontNormalLarge")
+    widgets.masterTakeButton = DependsOnMaster(Checkbox(panel, "Show a Take all button on the loot window", 16, -288,
+        function() return CL.db.masterTakeButton end,
+        function(v) CL.db.masterTakeButton = v CL.TakeAll.UpdateButton() end))
+    widgets.masterTakeAuto = DependsOnMaster(Checkbox(panel, "Take all automatically (hold Shift to skip)", 16, -312,
+        function() return CL.db.masterTakeAuto end,
+        function(v) CL.db.masterTakeAuto = v end))
+    Text(panel, "Gives you every item at or above the game's loot threshold, to hand out later.", 16, -342, "GameFontDisableSmall")
+
+    Text(panel, "Loot session", 16, -384, "GameFontNormalLarge")
+    widgets.sessionOpen = PushButton(panel, "Open the loot session window", 20, -412, 220, function()
+        CL.Session.Open()
+    end)
+    Text(panel, "Your tradable items, oldest first (also /cll session).", 16, -444, "GameFontDisableSmall")
+
+    -- only when Gargul is installed: both would announce the same hand-out
+    local head = Text(panel, "Gargul", 330, -116, "GameFontNormalLarge")
+    local note = Text(panel, "Gargul is installed and also announces what it awards. Choose which one does.", 330, -142, "GameFontDisableSmall")
+    note:SetWidth(290)
+    widgets.gargulAsk = PushButton(panel, "Gargul: who announces?", 334, -190, 190, function()
+        CL.MasterLoot.AskGargul(true)
+    end)
+    widgets.gargulAsk.Sync = function()
+        local there = CL.MasterLoot.GargulAnnounces() ~= nil
+        for _, region in ipairs({ head, note, widgets.gargulAsk }) do
+            if there then region:Show() else region:Hide() end
+        end
+    end
+
+    panel:SetScript("OnShow", Options.Refresh)
+    return panel
+end
+
 -------------------------------------------------
 -- The window
 -------------------------------------------------
@@ -666,6 +705,7 @@ local PAGES = {
     { key = "controller", label = "Controller mode", width = 130, build = BuildController },
     { key = "auto",       label = "Auto-roll",       width = 90,  build = BuildAutoRoll },
     { key = "watch",      label = "Watchlist",       width = 90,  build = BuildWatchlist },
+    { key = "master",      label = "Master loot",     width = 100, build = BuildMaster },
 }
 Options.pages = {}   -- key -> { panel =, tab = }
 
@@ -843,3 +883,4 @@ end
 function Options.OpenController() Options.Open("controller") end
 function Options.OpenAutoRoll() Options.Open("auto") end
 function Options.OpenWatchlist() Options.Open("watch") end
+function Options.OpenMaster() Options.Open("master") end
