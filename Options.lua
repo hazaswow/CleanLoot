@@ -205,6 +205,16 @@ local function DependsOnKeyboard(cb)
     return cb
 end
 
+-- A checkbox that only means something while the master-loot features are on: greyed out otherwise.
+local function DependsOnMaster(cb)
+    local sync = cb.Sync
+    cb.Sync = function()
+        sync()
+        if CL.MasterLoot.Enabled() then cb:Enable() else cb:Disable() end
+    end
+    return cb
+end
+
 -------------------------------------------------
 -- Panel
 -------------------------------------------------
@@ -261,12 +271,15 @@ local function Build(parent)
         function(v) CL.MinimapButton.SetHidden(v) end)
 
     Text(panel, "Master loot", 16, -432, "GameFontNormalLarge")
-    widgets.masterWindow = Checkbox(panel, "Show the roll results window", 16, -456,
+    widgets.masterEnabled = Checkbox(panel, "Enable master loot features", 16, -456,
+        function() return CL.MasterLoot.Enabled() end,
+        function(v) CL.MasterLoot.SetEnabled(v) end)
+    widgets.masterWindow = DependsOnMaster(Checkbox(panel, "Show the roll results window", 40, -480,
         function() return CL.db.masterWindow end,
-        function(v) CL.db.masterWindow = v end)
-    widgets.masterAnnounce = Checkbox(panel, "Announce hand-outs in /p or /ra", 16, -480,
+        function(v) CL.db.masterWindow = v end))
+    widgets.masterAnnounce = DependsOnMaster(Checkbox(panel, "Announce hand-outs in /p or /ra", 40, -504,
         function() return CL.db.masterAnnounce end,
-        function(v) CL.db.masterAnnounce = v end)
+        function(v) CL.db.masterAnnounce = v end))
     -- only when Gargul is installed: both would announce the same hand-out
     widgets.gargulAsk = PushButton(panel, "Gargul: who announces?", 150, -430, 170, function()
         CL.MasterLoot.AskGargul(true)

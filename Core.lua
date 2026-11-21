@@ -30,6 +30,7 @@ local DEFAULTS = {
     showWaiting = true,  -- the "waiting on rolls" card at the start of the winner popup
     autoRollEnabled = true,  -- master switch of the auto-roll rules (none exist until you make one)
     autoRollSay = true,  -- a chat line when a rule answers for you, or could not
+    masterEnabled = true,  -- master loot: the whole part (result window, hand-out, announcement) can be switched off
     masterWindow = true,  -- master loot: the roll results window, when the rolls are over
     masterAnnounce = true,  -- master loot: the master looter's hand-outs are announced in /p or /ra
     watchEnabled = true,  -- the watchlist's pulsing outline on the roll frames (nothing is watched until you add an item)

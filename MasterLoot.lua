@@ -35,6 +35,24 @@ local METHODS = { [0] = "freeforall", [1] = "roundrobin", [2] = "master", [3] = 
     [4] = "needbeforegreed", [5] = "personalloot" }
 
 -------------------------------------------------
+-- The switch: the whole master-loot part can be turned off (Options > General, /cll master)
+-------------------------------------------------
+function ML.Enabled()
+    return not (CL.db and CL.db.masterEnabled == false)
+end
+
+-- Off: windows and questions close, nothing more is watched or announced. The roll frames,
+-- auto-roll, the watchlist and the rest of CleanLoot are not touched.
+function ML.SetEnabled(on)
+    CL.db.masterEnabled = on and true or false
+    if not on then
+        ML.CloseAll()
+        if ML.GargulBox() then ML.GargulBox():Hide() end
+    end
+    if CL.Options and CL.Options.Refresh then CL.Options.Refresh() end
+end
+
+-------------------------------------------------
 -- Who is the master looter
 -------------------------------------------------
 -- "master", "group"... and, for a master looter, his party (0 = you) or raid index.
@@ -535,7 +553,7 @@ end
 
 -- Both would announce the same hand-out.
 function ML.GargulConflict()
-    return CL.db.masterAnnounce == true and ML.GargulAnnounces() == true
+    return ML.Enabled() and CL.db.masterAnnounce == true and ML.GargulAnnounces() == true
 end
 
 local gargulBox
@@ -559,8 +577,8 @@ local function CreateGargulBox()
     f.text:SetPoint("TOP", f, "TOP", 0, -38)
     f.text:SetWidth(340)
     f.text:SetJustifyH("CENTER")
-    f.text:SetText("Gargul is installed and announces the items you hand out in the chat, as CleanLoot does: "
-        .. "each hand-out would be announced twice. What do you prefer?")
+    f.text:SetText("Gargul is installed and also handles master loot: it announces what you award in the chat, "
+        .. "as CleanLoot does, so each hand-out would be announced twice. What do you prefer?")
 
     local function Choice(label, y, onClick)
         local b = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
@@ -578,9 +596,9 @@ local function CreateGargulBox()
     f.both = Choice("Keep both", -98, function()
         CL.Print("both keep announcing the hand-outs.")
     end)
-    f.mine = Choice("Turn off CleanLoot's announcements", -128, function()
-        CL.db.masterAnnounce = false
-        CL.Print("CleanLoot no longer announces hand-outs (Gargul does).")
+    f.mine = Choice("Turn off CleanLoot's master loot features", -128, function()
+        ML.SetEnabled(false)
+        CL.Print("CleanLoot's master loot features are off (Gargul does the job). Back on: Options > General, or /cll master on.")
     end)
     f.theirs = Choice("Turn off Gargul's award messages", -158, function()
         local g = GargulObject()
@@ -610,8 +628,8 @@ function ML.AskGargul(force)
     end
     if not ML.GargulConflict() then
         if force then
-            CL.Print(("Gargul's award messages are %s, CleanLoot's announcements are %s: nothing is announced twice."):format(
-                ML.GargulAnnounces() and "on" or "off", CL.db.masterAnnounce and "on" or "off"))
+            CL.Print(("Gargul's award messages are %s, CleanLoot's master loot announcements are %s: nothing is announced twice."):format(
+                ML.GargulAnnounces() and "on" or "off", (ML.Enabled() and CL.db.masterAnnounce) and "on" or "off"))
         end
         return false
     end
@@ -623,7 +641,7 @@ end
 
 -- Asked once, to the master looter, and not in the middle of a fight.
 function ML.MaybeAskGargul()
-    if CL.db.gargulAsked or not ML.IsMasterLooter() then return false end
+    if CL.db.gargulAsked or not ML.Enabled() or not ML.IsMasterLooter() then return false end
     if type(InCombatLockdown) == "function" and InCombatLockdown() == true then return false end
     return ML.AskGargul(false)
 end
@@ -637,9 +655,9 @@ local handled = {}   -- lootListKey -> true: its window was opened (or there was
 -- The history is brought up to date a moment after the event, so look then.
 function ML.OnComplete(key)
     key = CL.Plain(key)
-    if key == nil or handled[key] then return end
+    if key == nil or handled[key] or not ML.Enabled() then return end
     C_Timer.After(0.6, function()
-        if handled[key] or not ML.IsMasterLoot() then return end
+        if handled[key] or not ML.Enabled() or not ML.IsMasterLoot() then return end
         local res = CL.API.GetResult(key)
         if not res or res.winner or res.allPassed then return end   -- the game named one: Results shows it
         handled[key] = #res.rolls > 0 and true or "empty"   -- "empty": nobody had rolled yet, a later update may bring rolls
@@ -655,7 +673,7 @@ end
 -- joins the window; one that had no rolls yet gets its window now.
 function ML.OnDropUpdate(key)
     key = CL.Plain(key)
-    if key == nil or not handled[key] then return end
+    if key == nil or not handled[key] or not ML.Enabled() then return end
     local res = CL.API.GetResult(key)
     if not res or res.winner then return end
     for _, win in ipairs(active) do
@@ -675,6 +693,10 @@ end
 
 -- /cll sim master: a result window with a made-up group, to see it and try the click.
 function ML.Simulate()
+    if not ML.Enabled() then
+        CL.Print("the master loot features are off: turn them on in Options > General, or /cll master on.")
+        return nil
+    end
     local players = {
         { "Aludra", "MAGE" }, { "Baric", "WARRIOR" }, { "Cyndra", "PRIEST" }, { "Dorun", "HUNTER" },
         { "Eluned", "DRUID" }, { "Farrow", "ROGUE" },

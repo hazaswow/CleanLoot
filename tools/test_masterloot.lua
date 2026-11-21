@@ -54,7 +54,7 @@ local function reset()
     method, masterParty, masterRaid = "master", 0, nil
     inRaid, inGroup = false, true
     slots = { LINK }
-    CL.db.masterWindow, CL.db.masterAnnounce = true, true
+    CL.db.masterWindow, CL.db.masterAnnounce, CL.db.masterEnabled = true, true, true
     ML.CloseAll()
     CL.Results.ForgetRolls()
 end
@@ -326,6 +326,45 @@ WOW.FireEvent("LOOT_HISTORY_UPDATE_DROP", 0, 7302)
 check(#ML.Windows() == 1, "a history update for another roll opens nothing")
 reset()
 
+-- 11c. The master-loot switch
+reset()
+Standard(7400)
+over(7400)
+check(#ML.Windows() == 1, "(switch on: the window opens)")
+ML.SetEnabled(false)
+check(#ML.Windows() == 0 and not ML.Enabled() and CL.db.masterEnabled == false, "switching it off closes the windows")
+Standard(7401)
+over(7401)
+check(#ML.Windows() == 0, "off: no window when the rolls end")
+check(ML.Simulate() == nil and sayMatches("master loot features are off"), "off: /cll sim master says so")
+said = {}
+SlashCmdList.CLEANLOOT("master on")
+check(ML.Enabled() and sayMatches("master loot features: on"), "/cll master on turns it back on")
+SlashCmdList.CLEANLOOT("master off")
+check(not ML.Enabled() and sayMatches("master loot features: off"), "/cll master off turns it off")
+SlashCmdList.CLEANLOOT("master")
+check(not ML.Enabled(), "/cll master alone only says where it stands")
+-- a late history update does not reopen anything while it is off
+Drop(7402, { Entry("Teki La", "PRIEST", 4) })
+WOW.FireEvent("LOOT_HISTORY_UPDATE_DROP", 0, 7402)
+check(#ML.Windows() == 0, "off: a history update opens nothing")
+-- the options: the box, and the two it governs
+local W = CL.Options.widgets
+CL.Options.Refresh()
+check(W.masterEnabled and not W.masterEnabled:GetChecked(), "the General tab's box shows it off")
+check(not W.masterWindow:IsEnabled() and not W.masterAnnounce:IsEnabled(), "...and greys the two options under it")
+W.masterEnabled:SetChecked(true)
+W.masterEnabled.__scripts.OnClick(W.masterEnabled)
+check(ML.Enabled() and W.masterWindow:IsEnabled() and W.masterAnnounce:IsEnabled(), "ticking it turns the part on and the options back on")
+-- Gargul is not asked about while it is off
+Gargul = { Settings = { get = function() return true end, set = function() return true end } }
+CL.db.gargulAsked = nil
+ML.SetEnabled(false)
+check(not ML.MaybeAskGargul() and not ML.GargulConflict(), "off: Gargul is not asked about, there is no conflict")
+ML.SetEnabled(true)
+Gargul = nil
+reset()
+
 -- 12. Gargul also announces hand-outs: ask once which one keeps doing it
 local function fakeGargul(on)
     local g = { Settings = { values = { ["AwardingLoot.awardMessagesEnabled"] = on }, setCalls = 0 } }
@@ -363,10 +402,11 @@ Gargul = fakeGargul(true)
 ML.MaybeAskGargul()
 gb = ML.GargulBox()
 gb.mine.__scripts.OnClick(gb.mine)
-check(CL.db.masterAnnounce == false and Gargul.Settings.values["AwardingLoot.awardMessagesEnabled"] == true and Gargul.Settings.setCalls == 0,
-    "Turn off CleanLoot's: only our option goes off, Gargul is not touched")
+check(CL.db.masterEnabled == false and CL.db.masterAnnounce == true and Gargul.Settings.values["AwardingLoot.awardMessagesEnabled"] == true
+    and Gargul.Settings.setCalls == 0,
+    "Turn off CleanLoot's: our master loot part goes off, Gargul is not touched")
 check(not ML.GargulConflict(), "...and there is no conflict any more")
-CL.db.masterAnnounce = true
+CL.db.masterEnabled = true
 
 resetGargul()
 Gargul = fakeGargul(true)
