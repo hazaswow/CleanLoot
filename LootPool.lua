@@ -224,7 +224,7 @@ function Pool.List()
             list[#list + 1] = { guid = guid, itemID = e.itemID, link = e.link, name = Name(e.link),
                 quality = e.quality, seen = e.seen, expires = e.expires,
                 remaining = e.expires and e.expires - now or nil,
-                excluded = e.excluded and true or false }
+                excluded = e.excluded and true or false, awardedTo = e.awardedTo, awardedRoll = e.awardedRoll }
         end
     end
     table.sort(list, function(a, b)
@@ -236,13 +236,32 @@ function Pool.List()
     return list
 end
 
--- The ones offered in a session: all of them, but those the master looter left out.
+-- The ones offered in a session: all of them, but those the master looter left out and those
+-- already given to somebody (they wait in the bags to be traded).
 function Pool.Offered()
     local list = {}
     for _, e in ipairs(Pool.List()) do
-        if not e.excluded then list[#list + 1] = e end
+        if not e.excluded and not e.awardedTo then list[#list + 1] = e end
     end
     return list
+end
+
+-- The item was won by `name` in a session (with `roll`, like "MS 87"): it is no longer offered,
+-- and stays in the list until it is traded away.
+function Pool.SetAwarded(guid, name, roll)
+    local entry = Store()[guid]
+    if not entry then return false end
+    entry.awardedTo, entry.awardedRoll = name, roll
+    Changed()
+    return true
+end
+
+function Pool.ClearAwarded(guid)
+    local entry = Store()[guid]
+    if not entry then return false end
+    entry.awardedTo, entry.awardedRoll = nil, nil
+    Changed()
+    return true
 end
 
 function Pool.SetExcluded(guid, excluded)

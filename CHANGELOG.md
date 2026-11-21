@@ -8,7 +8,10 @@
 - All the master looter's messages go to /ra in a raid and /p in a party. An option sends them to /rw instead when you lead or assist.
 - The master loot settings now have their own tab in the options window, with the switch, the roll results, taking the loot and the session list.
 - Safer hand-outs: a first name is only taken for a player when it fits one player in the loot window's list (two characters called Hazas can no longer be mixed up).
-- Not in yet: the timed roll session itself (the rolls from your bags, with the countdown) is the next step.
+- **Timed loot sessions** (master looter): *Start session* in the `/cll session` window (or `/cll session start`) offers the items of the list one after the other, 15 seconds each by default (10 to 60 in *Options → Master loot*). For each item the group is told in the chat how to roll (`1-100=MS 1-99=OS 1-90=Other`), with reminders and a countdown for the last 3 seconds, and the rolls are read from the game's own `/roll` messages, so players with or without CleanLoot take part the same way. MS beats OS beats Other whatever the numbers; the first roll of a player counts, a later roll in a *lower* category replaces it (never the other way round), and a pass cancels the roll.
+- The best roll wins by itself (or untick that to pick every winner yourself with a click and a confirmation). A tie is announced and can be re-rolled between the tied players only. Pause, +10 s, Skip, Cancel and Re-roll each announce themselves in the chat. At the end each winner gets a whisper per item inviting them to come and trade you.
+- *Test it* (or `/cll session test`) runs a session with made-up players and sends nothing to the group; alone, a real session only prints to you, so you can roll with `/roll` and see it work.
+- Not in yet: the CleanLoot window for the other players (the item in play, everybody's rolls, roll buttons) and putting the won items in the trade window by itself.
 
 ## 1.6.0
 

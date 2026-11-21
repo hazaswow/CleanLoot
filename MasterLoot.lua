@@ -99,6 +99,7 @@ local function SameName(a, b)
     a, b = Norm(a), Norm(b)
     return a == b or a:find(b .. " ", 1, true) == 1 or b:find(a .. " ", 1, true) == 1
 end
+ML.SameName = SameName
 
 -- The item as the chat takes it: the classic coloured link, built from the item string.
 local function ChatLinkOf(link, fallbackName, quality)
@@ -316,9 +317,9 @@ local function CreateConfirm()
     f.give:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 20, 12)
     f.give:SetText("Give")
     f.give:SetScript("OnClick", function()
-        local win, entry = f.win, f.entry
+        local onYes = f.onYes
         f:Hide()
-        if win and entry then ML.Give(win, entry) end
+        if onYes then onYes() end
     end)
     f.cancel = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
     f.cancel:SetSize(100, 24)
@@ -348,17 +349,27 @@ local function CanGive(win)
     return not win.given and (win.simulated or ML.IsMasterLooter())
 end
 
+-- A confirmation at the mouse; `onYes` runs when its button is clicked.
+function ML.Confirmation(text, detail, onYes, button)
+    confirm = confirm or CreateConfirm()
+    confirm.win, confirm.entry = nil, nil
+    confirm.onYes = onYes
+    confirm.give:SetText(button or "Give")
+    confirm.text:SetText(text)
+    confirm.detail:SetText(detail or "")
+    PlaceAtCursor(confirm)
+    confirm:Show()
+end
+
 -- A click on a name: ask before giving.
 function ML.Ask(win, entry)
     if not (win and entry and CanGive(win)) then return end
-    confirm = confirm or CreateConfirm()
-    confirm.win, confirm.entry = win, entry
     local rr, gg, bb = CL.QualityColor(win.res.quality)
     local who = CL.Results.Hex(CL.Results.ClassColor(entry.class)) .. (entry.name:match("^([^%-]+)") or entry.name) .. "|r"
-    confirm.text:SetText(("Give %s%s|r to %s?"):format(CL.Results.Hex(rr, gg, bb), win.res.name or "?", who))
-    confirm.detail:SetText("Roll: " .. (CL.Results.RollText(entry.type, entry.value) or "?"))
-    PlaceAtCursor(confirm)
-    confirm:Show()
+    ML.Confirmation(("Give %s%s|r to %s?"):format(CL.Results.Hex(rr, gg, bb), win.res.name or "?", who),
+        "Roll: " .. (CL.Results.RollText(entry.type, entry.value) or "?"),
+        function() ML.Give(win, entry) end)
+    confirm.win, confirm.entry = win, entry   -- (closing the window closes its confirmation)
 end
 
 -------------------------------------------------

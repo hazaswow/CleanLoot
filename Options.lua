@@ -674,6 +674,19 @@ local function BuildMaster(parent)
     end)
     Text(panel, "Your tradable items, oldest first (also /cll session).", 16, -444, "GameFontDisableSmall")
 
+    -- the timed session
+    Text(panel, "Session settings", 330, -262, "GameFontNormalLarge")
+    widgets.sessionTime = DependsOnMaster(Slider(panel, "Time to roll, per item", 330, -290, 10, 60, 5, "%d s",
+        function() return CL.SessionRun.Duration() end,
+        function(v) CL.db.sessionTime = v end))
+    widgets.sessionAuto = DependsOnMaster(Checkbox(panel, "The best roll wins by itself", 330, -346,
+        function() return CL.db.sessionAuto end,
+        function(v) CL.db.sessionAuto = v end))
+    widgets.sessionWhisper = DependsOnMaster(Checkbox(panel, "Whisper the winners at the end", 330, -370,
+        function() return CL.db.sessionWhisper end,
+        function(v) CL.db.sessionWhisper = v end))
+    Text(panel, "Untick the first to pick every winner yourself.", 330, -400, "GameFontDisableSmall")
+
     -- only when Gargul is installed: both would announce the same hand-out
     local head = Text(panel, "Gargul", 330, -116, "GameFontNormalLarge")
     local note = Text(panel, "Gargul is installed and also announces what it awards. Choose which one does.", 330, -142, "GameFontDisableSmall")

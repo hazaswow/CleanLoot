@@ -25,6 +25,7 @@ Sim.lua
 MasterLoot.lua
 LootPool.lua
 TakeAll.lua
+SessionRun.lua
 Session.lua
 Options.lua
 Minimap.lua
