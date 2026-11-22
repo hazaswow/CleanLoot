@@ -27,6 +27,7 @@ LootPool.lua
 TakeAll.lua
 Disenchant.lua
 TradeFill.lua
+LootLearn.lua
 RollBook.lua
 Comm.lua
 SessionRun.lua

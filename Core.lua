@@ -34,6 +34,7 @@ local DEFAULTS = {
     deKeyword = "de",  -- the short word enchanters answer "who can disenchant?" with
     deKeep = false,  -- the disenchanter keeps the materials (off: he trades them back to the master looter)
     sessionDEAuto = true,  -- items nobody rolls for go to the designated disenchanter
+    learnLoot = true,  -- write down which boss drops what (kills and items, from the game's loot history)
     tradeFill = true,  -- when a winner is in the trade window with you, his items are put in it
     tradeNext = true,  -- more items than the six trade slots: open the next trade by itself
     sessionJoin = true,  -- show the session window when the master looter of your group starts a loot session
