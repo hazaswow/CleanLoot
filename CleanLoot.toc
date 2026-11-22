@@ -25,6 +25,7 @@ Sim.lua
 MasterLoot.lua
 LootPool.lua
 TakeAll.lua
+Disenchant.lua
 RollBook.lua
 Comm.lua
 SessionRun.lua

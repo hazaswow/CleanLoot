@@ -91,6 +91,28 @@ local function Broadcast(kind, ...)
     if state and not state.test and CL.Comm then CL.Comm.Send(kind, ...) end
 end
 
+-- Armor and weapons from green to epic can be disenchanted (anything the client cannot describe
+-- is given the benefit of the doubt).
+local function CanDisenchant(lot)
+    local instant = (C_Item and C_Item.GetItemInfoInstant) or GetItemInfoInstant
+    local quality = lot.quality or 0
+    if quality < 2 or quality > 4 then return false end
+    if type(instant) ~= "function" or not lot.link then return true end
+    local ok, _, _, _, _, _, classID = pcall(instant, lot.link)
+    if not ok or type(classID) ~= "number" then return true end
+    return classID == 2 or classID == 4   -- weapon or armor
+end
+Run.CanDisenchant = CanDisenchant
+
+local function DEName()
+    return CL.Disenchant and CL.Disenchant.Name() or nil
+end
+
+-- Items nobody wants (and the copies nobody rolled for) go to the disenchanter, when there is one.
+local function AutoDE(lot)
+    return CL.db.sessionDEAuto ~= false and DEName() ~= nil and CanDisenchant(lot)
+end
+
 local function LotIndex(lot)
     for i, l in ipairs(state and state.queue or {}) do
         if l == lot then return i end
@@ -328,6 +350,29 @@ local function Unassigned()
     return n
 end
 
+-- Give `count` copies of the item in play to the disenchanter. Returns how many went.
+local function AwardToDE(count)
+    local who = DEName()
+    if not who or count <= 0 then return 0 end
+    local item = state.item
+    local given = 0
+    for _ = 1, count do
+        if state.slots <= 0 then break end
+        local copy = (item.items and item.items[(item.count or 1) - state.slots + 1]) or item
+        state.slots = state.slots - 1
+        state.awards[#state.awards + 1] = { item = item, copy = copy, winner = who, de = true }
+        state.lotAwarded[#state.lotAwarded + 1] = ShortName(who)
+        if not state.test and copy.guid then CL.LootPool.SetAwarded(copy.guid, who, "disenchant") end
+        Broadcast("W", state.sid, state.index, who, "", "DE")
+        given = given + 1
+    end
+    if given > 0 then
+        Say(("[CleanLoot] %s%s goes to %s to disenchant."):format(LinkOf(item), given > 1 and (" x" .. given) or "",
+            ShortName(who)))
+    end
+    return given
+end
+
 -- The rolls are closed: the best rolls win the copies (by themselves, or the master looter
 -- picks); equal rolls on the last copy are announced and re-rolled or decided by the master looter.
 local function CloseItem()
@@ -338,7 +383,11 @@ local function CloseItem()
     Broadcast("C", state.sid, state.index)
     if #ranking == 0 then
         Say(("[CleanLoot] No roll for %s."):format(link))
-        state.awardedText = "Nobody rolled."
+        if AutoDE(state.item) and AwardToDE(state.slots) > 0 then
+            state.awardedText = "Nobody rolled: to the disenchanter."
+        else
+            state.awardedText = "Nobody rolled."
+        end
         Between()
         return
     end
@@ -388,6 +437,7 @@ function Run.Award(name)
         LABEL[entry.cat], entry.value))
     Broadcast("W", state.sid, state.index, name, entry.cat, entry.value)
     if state.slots == 0 or Unassigned() == 0 then
+        if state.slots > 0 and AutoDE(item) then AwardToDE(state.slots) end   -- copies nobody rolled for
         if #state.lotAwarded == 1 then
             state.awardedText = ("Assigned to %s (%s %d)."):format(ShortName(name), LABEL[entry.cat], entry.value)
         else
@@ -420,8 +470,12 @@ function End(cancelled)
         local me = MyName()
         for _, a in ipairs(awards) do
             if not (me and ML.SameName(a.winner, me)) then
-                local roll = a.cat and (" (%s %d)"):format(LABEL[a.cat], a.value) or ""
-                Whisper(a.winner, ("[CleanLoot] You won %s%s. Come trade me for it."):format(LinkOf(a.item), roll))
+                if a.de then
+                    Whisper(a.winner, CL.Disenchant.WhisperText(LinkOf(a.item)))
+                else
+                    local roll = a.cat and (" (%s %d)"):format(LABEL[a.cat], a.value) or ""
+                    Whisper(a.winner, ("[CleanLoot] You won %s%s. Come trade me for it."):format(LinkOf(a.item), roll))
+                end
             end
         end
     end
@@ -579,6 +633,15 @@ function Run.Cancel()
     return true
 end
 
+-- The master looter sends the copies still to give to the disenchanter.
+function Run.GiveToDE()
+    if not (state and state.phase == "decide" and state.slots > 0) then return false end
+    if AwardToDE(state.slots) == 0 then return false end
+    state.awardedText = "Assigned to " .. table.concat(state.lotAwarded, ", ") .. "."
+    Between()
+    return true
+end
+
 -- After a tie: only the tied players roll again, in the range of their category.
 function Run.Reroll()
     if not (state and state.phase == "decide" and state.tie and state.pendingClear == 0) then return false end
@@ -688,7 +751,7 @@ function Run.Unassign(award)
 end
 
 -- Give a free copy of a finished item to `name` by hand: one of its rolls (`entry`) or anybody.
-function Run.AssignManual(lot, name, entry)
+function Run.AssignManual(lot, name, entry, de)
     if not (state and lot and Run.CanEdit(lot)) then return false end
     name = type(name) == "string" and name:gsub("^%s+", ""):gsub("%s+$", "") or ""
     if name == "" then return false end
@@ -700,25 +763,36 @@ function Run.AssignManual(lot, name, entry)
     end
     if not copy then return false end
     state.awards[#state.awards + 1] = { item = lot, copy = copy, winner = name, cat = entry and entry.cat or nil,
-        value = entry and entry.value or nil, entry = entry }
+        value = entry and entry.value or nil, entry = entry, de = de or nil }
     if entry then entry.assigned = true end
     if not state.test and copy.guid then
-        CL.LootPool.SetAwarded(copy.guid, name, entry and (LABEL[entry.cat] .. " " .. entry.value) or "by hand")
+        CL.LootPool.SetAwarded(copy.guid, name,
+            de and "disenchant" or (entry and (LABEL[entry.cat] .. " " .. entry.value) or "by hand"))
     end
-    if entry then
+    if de then
+        Say(("[CleanLoot] %s goes to %s to disenchant."):format(LinkOf(lot), ShortName(name)))
+    elseif entry then
         Say(("[CleanLoot] %s assigned to %s for roll %s %d."):format(LinkOf(lot), ShortName(name), LABEL[entry.cat], entry.value))
     else
         Say(("[CleanLoot] %s assigned to %s."):format(LinkOf(lot), ShortName(name)))
     end
-    Broadcast("W", state.sid, LotIndex(lot), name, entry and entry.cat or "", entry and entry.value or "")
+    Broadcast("W", state.sid, LotIndex(lot), name, entry and entry.cat or "", de and "DE" or (entry and entry.value or ""))
     Touched()
     return true
+end
+
+-- A finished item's free copy to the disenchanter.
+function Run.AssignToDE(lot)
+    local who = DEName()
+    if not who then return false end
+    return Run.AssignManual(lot, who, nil, true)
 end
 
 -- What the window may offer now.
 function Run.Can(action)
     if not state then return false end
     if action == "cancel" then return true end
+    if action == "de" then return state.phase == "decide" and state.slots > 0 and DEName() ~= nil end
     if action == "roll" or action == "pass" then return state.phase == "rolling" end
     if action == "finish" then return state.phase == "review" end
     if action == "pause" then return state.phase == "rolling" end

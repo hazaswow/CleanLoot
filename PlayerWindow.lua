@@ -116,7 +116,15 @@ local function Refresh()
     else
         status = GREY .. "Waiting for the first item.|r"
     end
-    if S.won then status = GREEN .. "You won it! Come and trade the master looter.|r" end
+    if S.won == "de" then
+        status = GREEN .. "You are to disenchant it: come and trade the master looter.|r"
+    elseif S.won then
+        status = GREEN .. "You won it! Come and trade the master looter.|r"
+    else
+        for _, a in ipairs(S.awards) do
+            if a.de then status = GREEN .. ("%s will disenchant it.|r"):format(ShortName(a.name)) end
+        end
+    end
     win.time:SetText(timeText)
     win.status:SetText(status)
 
@@ -385,8 +393,9 @@ end)
 Comm.On("W", function(f, sender)
     -- sid, index, name, cat, value
     if not Mine(f, sender) then return end
-    S.awards[#S.awards + 1] = { name = f[3], cat = tonumber(f[4]), value = tonumber(f[5]) }
-    if IsMe(f[3]) then S.won = true end
+    local de = f[5] == "DE"
+    S.awards[#S.awards + 1] = { name = f[3], cat = tonumber(f[4]), value = tonumber(f[5]), de = de }
+    if IsMe(f[3]) then S.won = de and "de" or true end
     Refresh()
 end)
 

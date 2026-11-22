@@ -241,7 +241,7 @@ local function RefreshRun()
     local resume = Run().Can("resume")
     win.controls.pause[(not review and not resume) and "Show" or "Hide"](win.controls.pause)
     win.controls.resume[(not review and resume) and "Show" or "Hide"](win.controls.resume)
-    for _, name in ipairs({ "extend", "skip", "reroll" }) do
+    for _, name in ipairs({ "extend", "skip", "reroll", "de" }) do
         win.controls[name][review and "Hide" or "Show"](win.controls[name])
     end
     win.controls.finish[review and "Show" or "Hide"](win.controls.finish)
@@ -280,6 +280,7 @@ local function RefreshEdit(state, hist)
     else
         win.manualAssign:Disable()
     end
+    if canEdit and CL.Disenchant.Name() then win.deButton:Enable() else win.deButton:Disable() end
 end
 
 -------------------------------------------------
@@ -349,6 +350,7 @@ local function Refresh()
         for _, row in ipairs(win.rows) do row:Hide() end
         win.sub:Show()
         win.refresh:Show()
+        win.deOpen:Show()
         win.start:Show()
         win.test:Show()
         RefreshList()
@@ -454,8 +456,20 @@ local function Create()
         f.rows[i] = row
     end
 
+    f.deOpen = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+    f.deOpen:SetSize(90, 22)
+    f.deOpen:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 94, 10)
+    f.deOpen:SetText("Disenchant")
+    f.deOpen:SetScript("OnClick", function() CL.Disenchant.Toggle() end)
+    f.deOpen:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        local name = CL.Disenchant.Name()
+        GameTooltip:AddLine(name and ("Disenchanter: " .. name) or "Ask who can disenchant and designate one.", 1, 1, 1, true)
+        GameTooltip:Show()
+    end)
+    f.deOpen:SetScript("OnLeave", function() GameTooltip:Hide() end)
     f.refresh = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-    f.refresh:SetSize(90, 22)
+    f.refresh:SetSize(76, 22)
     f.refresh:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 12, 10)
     f.refresh:SetText("Refresh")
     f.refresh:SetScript("OnClick", function()
@@ -489,7 +503,7 @@ local function Create()
         GameTooltip:Show()
     end)
     f.test:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    f.listParts = { f.sub, f.refresh, f.start, f.test }
+    f.listParts = { f.sub, f.refresh, f.start, f.test, f.deOpen }
     for _, row in ipairs(f.rows) do f.listParts[#f.listParts + 1] = row end
 
     ---------------- what the session and the changes share: the item and the rolls
@@ -625,13 +639,14 @@ local function Create()
         f.controls[action] = b
         return b
     end
-    Control("pause", "Pause", 72, 12, function() Run().Pause() end, "Stop the timer. The group is told.")
-    Control("resume", "Resume", 72, 12, function() Run().Resume() end, "Start the timer again. The group is told.")
-    Control("extend", "+10 s", 60, 90, function() Run().Extend() end, "Add ten seconds. The group is told.")
-    Control("skip", "Skip", 60, 156, function() Run().Skip() end, "Leave this item unassigned and go on.")
-    Control("reroll", "Re-roll", 72, 222, function() Run().Reroll() end, "Only the tied players roll again.")
+    Control("pause", "Pause", 66, 12, function() Run().Pause() end, "Stop the timer. The group is told.")
+    Control("resume", "Resume", 66, 12, function() Run().Resume() end, "Start the timer again. The group is told.")
+    Control("extend", "+10 s", 52, 82, function() Run().Extend() end, "Add ten seconds. The group is told.")
+    Control("skip", "Skip", 48, 138, function() Run().Skip() end, "Leave this item unassigned and go on.")
+    Control("reroll", "Re-roll", 62, 190, function() Run().Reroll() end, "Only the tied players roll again.")
+    Control("de", "To DE", 58, 256, function() Run().GiveToDE() end, "Send the copies still to give to the disenchanter.")
     Control("finish", "Finish now", 100, 12, function() Run().Finish() end, "End the session: the winners get their whispers.")
-    Control("cancel", "Cancel", 72, WIN_W - 84, function() Run().Cancel() end, "End the session now. The group is told.")
+    Control("cancel", "Cancel", 66, WIN_W - 78, function() Run().Cancel() end, "End the session now. The group is told.")
 
     ---------------- the changes: give a copy to anybody, and back
     local label = Part(f.editParts, f:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall"))
@@ -662,6 +677,15 @@ local function Create()
     f.backButton:SetScript("OnClick", function()
         f.editIndex = nil
         Refresh()
+    end)
+    f.deButton = Part(f.editParts, CreateFrame("Button", nil, f, "UIPanelButtonTemplate"))
+    f.deButton:SetSize(130, 22)
+    f.deButton:SetPoint("LEFT", f.backButton, "RIGHT", 6, 0)
+    f.deButton:SetText("To the disenchanter")
+    f.deButton:SetScript("OnClick", function()
+        local hist = f.editIndex and Run().History()[f.editIndex]
+        if not hist then return end
+        Run().AssignToDE(hist.lot)
     end)
 
     ---------------- the icons at the side

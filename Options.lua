@@ -708,6 +708,48 @@ local function BuildMaster(parent)
     return panel
 end
 
+-- The page of the disenchanter: who, how to ask, what happens to the materials.
+local function BuildDisenchant(parent)
+    local panel = CreateFrame("Frame", nil, parent)
+    panel.name = "Disenchanter"
+    Options.dePanel = panel
+
+    Text(panel, "Disenchanter", 16, -16, "GameFontNormalLarge")
+    Text(panel, "Ask the group who can disenchant, designate one, and give him what nobody wants.", 16, -44, "GameFontDisableSmall")
+    widgets.deOpen = PushButton(panel, "Open the disenchanter window", 20, -72, 230, function() CL.Disenchant.Open() end)
+    widgets.deCurrent = Text(panel, "", 16, -108, "GameFontHighlight")
+    widgets.deCurrent.Sync = function()
+        local name = CL.Disenchant.Name()
+        widgets.deCurrent:SetText(name and ("Designated: " .. name) or "Nobody designated yet.")
+    end
+
+    Text(panel, "The word enchanters answer with", 16, -150, "GameFontNormalLarge")
+    Text(panel, "Short and simple (\"de\"); a number after it is their skill (\"de 300\").", 16, -178, "GameFontDisableSmall")
+    local box = TextBox(panel, 20, -198, 120)
+    box:SetMaxLetters(12)
+    widgets.deKeyword = box
+    box.Sync = function() if not box:HasFocus() then box:SetText(CL.db.deKeyword or "de") end end
+    box:SetScript("OnEditFocusLost", function(self)
+        local text = (self:GetText() or ""):gsub("%s", "")
+        CL.db.deKeyword = text ~= "" and text or "de"
+        self:SetText(CL.db.deKeyword)
+    end)
+
+    Text(panel, "What happens to the items", 16, -246, "GameFontNormalLarge")
+    widgets.sessionDEAuto = DependsOnMaster(Checkbox(panel, "Items nobody rolls for go to the disenchanter", 16, -274,
+        function() return CL.db.sessionDEAuto end,
+        function(v) CL.db.sessionDEAuto = v end))
+    widgets.deKeep = DependsOnMaster(Checkbox(panel, "The disenchanter keeps the materials", 16, -298,
+        function() return CL.db.deKeep end,
+        function(v) CL.db.deKeep = v end))
+    Text(panel, "Off: he trades the materials back to you, to keep or share out.", 16, -328, "GameFontDisableSmall")
+    Text(panel, "Armor and weapons from green to epic only. In a session, a button sends an item to him.", 16, -346, "GameFontDisableSmall")
+    Text(panel, "/cll de ask   /cll de <name>   /cll de clear", 16, -380, "GameFontDisableSmall")
+
+    panel:SetScript("OnShow", Options.Refresh)
+    return panel
+end
+
 -------------------------------------------------
 -- The window
 -------------------------------------------------
@@ -722,6 +764,7 @@ local PAGES = {
     { key = "auto",       label = "Auto-roll",       width = 90,  build = BuildAutoRoll },
     { key = "watch",      label = "Watchlist",       width = 90,  build = BuildWatchlist },
     { key = "master",      label = "Master loot",     width = 100, build = BuildMaster },
+    { key = "de",          label = "Disenchanter",    width = 100, build = BuildDisenchant },
 }
 Options.pages = {}   -- key -> { panel =, tab = }
 
