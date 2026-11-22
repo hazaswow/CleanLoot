@@ -48,6 +48,7 @@ function ML.SetEnabled(on)
     if not on then
         ML.CloseAll()
         if ML.GargulBox() then ML.GargulBox():Hide() end
+        if CL.PlayerWindow then CL.PlayerWindow.Reset() end
     end
     if CL.Options and CL.Options.Refresh then CL.Options.Refresh() end
 end
@@ -73,6 +74,27 @@ end
 
 function ML.IsMasterLoot()
     return ML.LootMethod() == "master"
+end
+
+-- The name of the group's master looter (nil when there is none, or it cannot be told).
+function ML.MasterLooterName()
+    local method, party, raid = ML.LootMethod()
+    if method ~= "master" then return nil end
+    local function name(unit)
+        local ok, n = pcall(UnitName, unit)
+        return ok and type(n) == "string" and n or nil
+    end
+    if party == 0 then return name("player") end
+    if type(party) == "number" and party > 0 then
+        local n = name("party" .. party)
+        if n then return n end
+    end
+    if type(raid) == "number" and raid > 0 then
+        local ok, n = pcall(GetRaidRosterInfo, raid)
+        if ok and type(n) == "string" then return n end
+        return name("raid" .. raid)
+    end
+    return nil
 end
 
 function ML.IsMasterLooter()

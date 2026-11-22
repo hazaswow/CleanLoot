@@ -13,8 +13,9 @@
 - **Identical items** (same item, enchants, gems and bonuses) are offered together: one roll for all the copies, and the best rolls win a copy each (three copies, the three best rolls). Equal rolls on the last copy are announced and re-rolled between the tied only.
 - **Going back:** a small icon for every item already done sits at the side of the window; a click goes back to it to take an assignment back (with a confirmation), give a copy to one of the rolls, or give one by hand to anybody by name. After the last item the session waits 30 seconds (each change gives more time) before the whispers go out, or *Finish now*.
 - Each kind of roll has its own colour (MS, OS, Other), and the master looter has roll buttons of his own (MS, OS, Other, Pass) in the session window: they make the game's /roll like everybody's.
+- **A window for the other players:** players with CleanLoot get a window while the master looter's session runs, with the item in play, the time left, everybody's rolls as they come in (same colours, same rules) and buttons to roll themselves (MS 1-100, OS 1-99, Other 1-90) or pass. It follows the master looter's CleanLoot through addon messages (only the group's master looter is believed) and reads the rolls from the game's `/roll` messages; players without CleanLoot take part exactly as before, by typing `/roll`. An option turns the window off.
 - *Test it* (or `/cll session test`) runs a session with made-up players and sends nothing to the group; alone, a real session only prints to you, so you can roll with `/roll` and see it work.
-- Not in yet: the CleanLoot window for the other players (the item in play, everybody's rolls, roll buttons) and putting the won items in the trade window by itself.
+- Not in yet: putting the won items in the trade window by itself when the winner trades you.
 
 ## 1.6.0
 

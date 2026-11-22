@@ -685,7 +685,10 @@ local function BuildMaster(parent)
     widgets.sessionWhisper = DependsOnMaster(Checkbox(panel, "Whisper the winners at the end", 330, -370,
         function() return CL.db.sessionWhisper end,
         function(v) CL.db.sessionWhisper = v end))
-    Text(panel, "Untick the first to pick every winner yourself.", 330, -400, "GameFontDisableSmall")
+    Text(panel, "Untick the first to pick every winner yourself.", 330, -396, "GameFontDisableSmall")
+    widgets.sessionJoin = DependsOnMaster(Checkbox(panel, "Show the session window when the master looter starts one", 330, -420,
+        function() return CL.db.sessionJoin end,
+        function(v) CL.db.sessionJoin = v end))
 
     -- only when Gargul is installed: both would announce the same hand-out
     local head = Text(panel, "Gargul", 330, -116, "GameFontNormalLarge")

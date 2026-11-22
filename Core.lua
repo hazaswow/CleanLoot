@@ -31,6 +31,7 @@ local DEFAULTS = {
     autoRollEnabled = true,  -- master switch of the auto-roll rules (none exist until you make one)
     autoRollSay = true,  -- a chat line when a rule answers for you, or could not
     masterEnabled = true,  -- master loot: the whole part (result window, hand-out, announcement) can be switched off
+    sessionJoin = true,  -- show the session window when the master looter of your group starts a loot session
     sessionTime = 15,  -- seconds each item stays open for rolls in a loot session (10-60)
     sessionAuto = true,  -- the best roll wins by itself (off: the master looter picks)
     sessionWhisper = true,  -- at the end each winner gets a whisper per item, to come and trade

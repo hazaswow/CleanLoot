@@ -19,6 +19,7 @@ local Run = {}
 CL.SessionRun = Run
 
 local ML = CL.MasterLoot
+local Book = CL.RollBook
 
 local PAUSE_BETWEEN = 3     -- seconds between an item's result and the next item
 local REVIEW_WAIT = 30      -- after the last item: time to change an assignment before the session ends
@@ -84,6 +85,19 @@ local function LinkOf(item)
     return ML.ChatLink(item.link, item.name, item.quality)
 end
 
+-- Tell the other players' CleanLoot what happens (Comm.lua). Never from a test session, and
+-- nothing goes out alone.
+local function Broadcast(kind, ...)
+    if state and not state.test and CL.Comm then CL.Comm.Send(kind, ...) end
+end
+
+local function LotIndex(lot)
+    for i, l in ipairs(state and state.queue or {}) do
+        if l == lot then return i end
+    end
+    return 0
+end
+
 local function ShortName(name)
     return type(name) == "string" and (name:match("^([^%-]+)") or name) or "?"
 end
@@ -129,19 +143,19 @@ local function RollPattern()
     return rollPattern
 end
 
--- One roll seen in the chat. Returns true when it counts.
+-- "X rolls N (1-100)" -> name, value, low, high (nil when the text is something else).
+function Run.ParseRoll(text)
+    local pattern = RollPattern()
+    if not pattern or type(text) ~= "string" then return nil end
+    local name, value, low, high = text:match(pattern)
+    if not name then return nil end
+    return name, tonumber(value), tonumber(low), tonumber(high)
+end
+
+-- One roll seen in the chat. Returns true when it counts (the rules are in RollBook.lua).
 function Run.HandleRoll(name, value, low, high)
     if not (state and state.phase == "rolling") then return false end
-    if type(name) ~= "string" or type(value) ~= "number" or low ~= 1 then return false end
-    local cat = CAT_OF[high]
-    if not cat then return false end   -- not one of the three ranges: not a roll for this
-    if state.restrict then
-        if not state.restrict.names[name] or cat ~= state.restrict.cat then return false end
-    end
-    local old = state.rolls[name]
-    if old and cat <= old.cat then return false end   -- the same category again, or an upgrade
-    state.rolls[name] = { cat = cat, value = value }
-    state.passed[name] = nil
+    if not Book.Add(state, name, value, low, high) then return false end
     Changed()
     return true
 end
@@ -149,32 +163,15 @@ end
 -- Somebody passes: their roll is cancelled (CleanLoot players pass with a button).
 function Run.Pass(name)
     if not (state and state.phase == "rolling") then return false end
-    state.rolls[name] = nil
-    state.passed[name] = true
+    Book.Pass(state, name)
     Changed()
     return true
 end
 
 -- The rolls, best first: { { name, cat, value, tied }, ... }, and how many share the best.
 function Run.Ranking()
-    local list = {}
-    if not state then return list, 0 end
-    for name, r in pairs(state.rolls) do
-        list[#list + 1] = { name = name, cat = r.cat, value = r.value }
-    end
-    table.sort(list, function(a, b)
-        if a.cat ~= b.cat then return a.cat < b.cat end
-        if a.value ~= b.value then return a.value > b.value end
-        return a.name < b.name
-    end)
-    local top, tied = list[1], 0
-    for _, e in ipairs(list) do
-        if top and e.cat == top.cat and e.value == top.value then tied = tied + 1 end
-    end
-    for _, e in ipairs(list) do
-        e.tied = tied > 1 and top and e.cat == top.cat and e.value == top.value or false
-    end
-    return list, tied
+    if not state then return {}, 0 end
+    return Book.Ranking(state)
 end
 
 local function RangeText(cat)
@@ -301,6 +298,7 @@ function BeginItem()
         Say(("Roll for %s (%d/%d): 1-100=MS 1-99=OS 1-90=Other. %d sec left"):format(
             LinkOf(item), state.index, #state.queue, state.duration))
     end
+    Broadcast("I", state.sid, state.index, #state.queue, item.count or 1, item.link or "", state.duration)
     runner:Show()
     Changed()
 end
@@ -337,6 +335,7 @@ local function CloseItem()
     local ranking = Run.Ranking()
     state.ranking = ranking
     local link = LinkOf(state.item)
+    Broadcast("C", state.sid, state.index)
     if #ranking == 0 then
         Say(("[CleanLoot] No roll for %s."):format(link))
         state.awardedText = "Nobody rolled."
@@ -387,6 +386,7 @@ function Run.Award(name)
     end
     Say(("[CleanLoot] %s assigned to %s for roll %s %d."):format(LinkOf(item), ShortName(name),
         LABEL[entry.cat], entry.value))
+    Broadcast("W", state.sid, state.index, name, entry.cat, entry.value)
     if state.slots == 0 or Unassigned() == 0 then
         if #state.lotAwarded == 1 then
             state.awardedText = ("Assigned to %s (%s %d)."):format(ShortName(name), LABEL[entry.cat], entry.value)
@@ -406,6 +406,7 @@ function Run.Award(name)
 end
 
 function End(cancelled)
+    Broadcast(cancelled and "K" or "E", state.sid)
     local awards = state.awards
     if not cancelled then
         if #awards == 0 then
@@ -487,10 +488,11 @@ end
 local function Begin(items, test)
     local lots = MakeLots(items)
     state = { queue = lots, index = 0, test = test, awards = {}, history = {}, duration = Run.Duration(),
-        phase = "starting" }
+        phase = "starting", sid = ("%d%03d"):format(math.floor(GetTime()), math.random(0, 999)) }
     local different = #lots ~= #items and (" (%d different)"):format(#lots) or ""
     Say(("[CleanLoot] Loot session: %d item%s%s, %d sec each. 1-100=MS 1-99=OS 1-90=Other"):format(
         #items, #items == 1 and "" or "s", different, state.duration))
+    Broadcast("S", CL.Comm and CL.Comm.VERSION or 1, state.sid, #lots, state.duration)
     Next()
     return true
 end
@@ -533,6 +535,7 @@ function Run.Pause()
     if not (state and state.phase == "rolling") then return false end
     state.phase = "paused"
     Say("[CleanLoot] Session paused.")
+    Broadcast("P", state.sid, state.index, 1, math.ceil(state.remaining))
     Changed()
     return true
 end
@@ -541,6 +544,7 @@ function Run.Resume()
     if not (state and state.phase == "paused") then return false end
     state.phase = "rolling"
     Say(("[CleanLoot] Session resumed: %d sec left for %s."):format(math.ceil(state.remaining), LinkOf(state.item)))
+    Broadcast("P", state.sid, state.index, 0, math.ceil(state.remaining))
     Changed()
     return true
 end
@@ -552,6 +556,7 @@ function Run.Extend()
         if mark < state.remaining then state.fired[mark] = nil end   -- the reminders below come again
     end
     Say(("[CleanLoot] +%d sec for %s: %d sec left."):format(EXTEND, LinkOf(state.item), math.ceil(state.remaining)))
+    Broadcast("P", state.sid, state.index, state.phase == "paused" and 1 or 0, math.ceil(state.remaining))
     Changed()
     return true
 end
@@ -561,6 +566,7 @@ function Run.Skip()
     if not (state and (Rolling() or state.phase == "decide")) then return false end
     Say(("[CleanLoot] %s skipped."):format(LinkOf(state.item)))
     state.ranking = state.ranking or Run.Ranking()
+    Broadcast("Z", state.sid, state.index)
     state.awardedText = "Skipped."
     Between()
     return true
@@ -576,10 +582,11 @@ end
 -- After a tie: only the tied players roll again, in the range of their category.
 function Run.Reroll()
     if not (state and state.phase == "decide" and state.tie and state.pendingClear == 0) then return false end
-    local names, list, cat = {}, {}, state.contested[1].cat
+    local names, list, full, cat = {}, {}, {}, state.contested[1].cat
     for _, e in ipairs(state.contested) do
         names[e.name] = true
         list[#list + 1] = ShortName(e.name)
+        full[#full + 1] = e.name
     end
     state.restrict = { names = names, cat = cat }
     state.rolls, state.passed, state.ranking, state.tie, state.contested = {}, {}, nil, false, nil
@@ -589,6 +596,7 @@ function Run.Reroll()
     local copies = state.slots > 1 and (" (%d copies to give)"):format(state.slots) or ""
     Say(("[CleanLoot] Re-roll for %s between %s: %s%s. %d sec left"):format(LinkOf(state.item),
         table.concat(list, ", "), RangeText(cat), copies, state.duration))
+    Broadcast("R", state.sid, state.index, table.concat(full, ","), cat, state.duration)
     Changed()
     return true
 end
@@ -671,6 +679,7 @@ function Run.Unassign(award)
             if award.entry then award.entry.assigned = false end
             if not state.test and award.copy and award.copy.guid then CL.LootPool.ClearAwarded(award.copy.guid) end
             Say(("[CleanLoot] %s is no longer assigned to %s."):format(LinkOf(award.item), ShortName(award.winner)))
+            Broadcast("X", state.sid, LotIndex(award.item), award.winner)
             Touched()
             return true
         end
@@ -701,6 +710,7 @@ function Run.AssignManual(lot, name, entry)
     else
         Say(("[CleanLoot] %s assigned to %s."):format(LinkOf(lot), ShortName(name)))
     end
+    Broadcast("W", state.sid, LotIndex(lot), name, entry and entry.cat or "", entry and entry.value or "")
     Touched()
     return true
 end
@@ -723,13 +733,24 @@ end
 -------------------------------------------------
 -- The game's roll messages
 -------------------------------------------------
+-- A player of the group passes with his CleanLoot window.
+if CL.Comm then
+    CL.Comm.On("Q", function(fields, sender)
+        if not (state and state.phase == "rolling" and fields[1] == state.sid and tonumber(fields[2]) == state.index) then
+            return
+        end
+        local who = sender
+        for name in pairs(state.rolls) do
+            if ML.SameName(name, sender) then who = name break end
+        end
+        Run.Pass(who)
+    end)
+end
+
 local events = CreateFrame("Frame")
 events:RegisterEvent("CHAT_MSG_SYSTEM")
 events:SetScript("OnEvent", function(_, _, text)
     if not (state and state.phase == "rolling") or state.test then return end
-    local pattern = RollPattern()
-    text = CL.Plain(text)
-    if not pattern or type(text) ~= "string" then return end
-    local name, value, low, high = text:match(pattern)
-    if name then Run.HandleRoll(name, tonumber(value), tonumber(low), tonumber(high)) end
+    local name, value, low, high = Run.ParseRoll(CL.Plain(text))
+    if name then Run.HandleRoll(name, value, low, high) end
 end)

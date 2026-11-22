@@ -25,8 +25,11 @@ Sim.lua
 MasterLoot.lua
 LootPool.lua
 TakeAll.lua
+RollBook.lua
+Comm.lua
 SessionRun.lua
 Session.lua
+PlayerWindow.lua
 Options.lua
 Minimap.lua
 ChatFilter.lua
