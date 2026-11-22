@@ -16,6 +16,7 @@ local HELP = {
     "/cll session       the items of your bags you can hand out (master looter)",
     "/cll session start | test | stop   start a timed loot session | try one alone | cancel it",
     "/cll take          give yourself every master-loot item of the open loot window",
+    "/cll trade         put in the open trade window the items its player won",
     "/cll de [ask | stop | clear | <name>]  the disenchanter: ask the group who can, or designate one",
     "/cll gargul        choose who announces the hand-outs when Gargul is installed",
     "/cll sim group <n> other players in the simulated group (1-39, default 4)",
@@ -68,6 +69,8 @@ SlashCmdList["CLEANLOOT"] = function(msg)
         CL.Session.Command(rest)
     elseif cmd == "take" then
         CL.TakeAll.Run(false)
+    elseif cmd == "trade" then
+        CL.TradeFill.Command()
     elseif cmd == "de" then
         CL.Disenchant.Command((msg or ""):match("^%s*%S+%s*(.-)%s*$"))
     elseif cmd == "gargul" then

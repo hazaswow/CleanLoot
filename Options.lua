@@ -690,6 +690,14 @@ local function BuildMaster(parent)
         function() return CL.db.sessionJoin end,
         function(v) CL.db.sessionJoin = v end))
 
+    Text(panel, "Handing over", 330, -462, "GameFontNormalLarge")
+    widgets.tradeFill = DependsOnMaster(Checkbox(panel, "Put the won items in the trade window", 330, -488,
+        function() return CL.db.tradeFill end,
+        function(v) CL.db.tradeFill = v end))
+    widgets.tradeNext = DependsOnMaster(Checkbox(panel, "Open the next trade by itself (6 items a trade)", 330, -512,
+        function() return CL.db.tradeNext end,
+        function(v) CL.db.tradeNext = v end))
+
     -- only when Gargul is installed: both would announce the same hand-out
     local head = Text(panel, "Gargul", 330, -116, "GameFontNormalLarge")
     local note = Text(panel, "Gargul is installed and also announces what it awards. Choose which one does.", 330, -142, "GameFontDisableSmall")
