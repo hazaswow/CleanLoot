@@ -21,6 +21,7 @@ CL.SessionRun = Run
 local ML = CL.MasterLoot
 
 local PAUSE_BETWEEN = 3     -- seconds between an item's result and the next item
+local REVIEW_WAIT = 30      -- after the last item: time to change an assignment before the session ends
 local EXTEND = 10           -- seconds a click on +10 s adds
 local WHISPER_GAP = 0.4     -- between two whispers
 
@@ -28,6 +29,9 @@ local LABEL = { "MS", "OS", "Other" }
 local RANGE = { 100, 99, 90 }
 local CAT_OF = { [100] = 1, [99] = 2, [90] = 3 }
 function Run.Label(cat) return LABEL[cat] end
+-- One colour per kind of roll, so MS, OS and Other are told apart at a glance.
+local COLOR = { "|cffff9933", "|cff33ccff", "|cffcc99ff" }
+function Run.CatColor(cat) return COLOR[cat] or "" end
 
 local state   -- nil while no session runs
 function Run.State() return state end
@@ -177,6 +181,63 @@ local function RangeText(cat)
     return ("1-%d=%s"):format(RANGE[cat], LABEL[cat])
 end
 
+-- Identical items (100%: the same item, enchants, gems and bonuses) are offered together: one
+-- roll for all the copies, and as many winners as there are copies, best rolls first. The one
+-- field that differs from one copy to the next, the unique id of the link, is ignored.
+function Run.ItemKey(link)
+    local itemString = type(link) == "string" and link:match("|H(item:[^|]+)|h")
+    if not itemString then return nil end
+    local fields = {}
+    for field in (itemString .. ":"):gmatch("([^:]*):") do fields[#fields + 1] = field end
+    -- item:itemID:enchant:gem1:gem2:gem3:gem4:suffix:uniqueID:...  (the 9th field is the unique id)
+    if #fields >= 9 then fields[9] = "" end
+    return table.concat(fields, ":")
+end
+
+-- The items of the list grouped by identity, oldest first:
+--   { { link, name, quality, guid, items = { entry, ... }, count }, ... }
+local function MakeLots(entries)
+    local lots, byKey = {}, {}
+    for _, e in ipairs(entries) do
+        local key = Run.ItemKey(e.link) or ("one:" .. tostring(e.guid or e.name))
+        local lot = byKey[key]
+        if not lot then
+            lot = { link = e.link, name = e.name, quality = e.quality, guid = e.guid, items = {}, count = 0 }
+            byKey[key] = lot
+            lots[#lots + 1] = lot
+        end
+        lot.items[#lot.items + 1] = e
+        lot.count = lot.count + 1
+    end
+    return lots
+end
+Run.MakeLots = MakeLots
+
+-- Who wins with `slots` copies to give, from the rolls (best first): the players above the line,
+-- and, when equal rolls straddle the last copy, that group and how many of them still win.
+--   winners, contested (or nil), need
+local function Plan(ranking, slots)
+    local winners, contested, need = {}, nil, 0
+    local i = 1
+    while i <= #ranking and slots > 0 do
+        local first = ranking[i]
+        local group, j = {}, i
+        while j <= #ranking and ranking[j].cat == first.cat and ranking[j].value == first.value do
+            group[#group + 1] = ranking[j]
+            j = j + 1
+        end
+        if #group <= slots then
+            for _, e in ipairs(group) do winners[#winners + 1] = e end
+            slots = slots - #group
+        else
+            contested, need = group, slots
+            break
+        end
+        i = j
+    end
+    return winners, contested, need
+end
+
 -------------------------------------------------
 -- The flow
 -------------------------------------------------
@@ -184,6 +245,11 @@ local runner = CreateFrame("Frame")
 runner:Hide()
 
 local function Between(seconds)
+    -- the item is done: remember it, the master looter can come back to it
+    if state.item and state.recorded ~= state.index then
+        state.recorded = state.index
+        state.history[#state.history + 1] = { lot = state.item, ranking = state.ranking or {} }
+    end
     state.phase = "between"
     state.wait = seconds or PAUSE_BETWEEN
     Changed()
@@ -194,7 +260,11 @@ local BeginItem, End
 local function Next()
     state.index = state.index + 1
     if state.index > #state.queue then
-        End(false)
+        -- every item is done: a moment to change an assignment before the whispers go out
+        state.phase = "review"
+        state.reviewLeft = REVIEW_WAIT
+        state.item = nil
+        Changed()
     else
         BeginItem()
     end
@@ -217,21 +287,54 @@ function BeginItem()
     state.item = item
     state.rolls, state.passed = {}, {}
     state.restrict, state.ranking, state.tie = nil, nil, false
+    state.slots, state.contested, state.need, state.pendingClear = item.count or 1, nil, 0, 0
+    state.lotAwarded = {}
     state.remaining = state.duration
     state.marks = Run.Marks(state.duration)
     state.fired = {}
     state.phase = "rolling"
     state.fake = state.test and MakeFake(state.duration) or nil
-    Say(("Roll for %s (%d/%d): 1-100=MS 1-99=OS 1-90=Other. %d sec left"):format(
-        LinkOf(item), state.index, #state.queue, state.duration))
+    if (item.count or 1) > 1 then
+        Say(("Roll for %s x%d (%d/%d): the %d best rolls win. 1-100=MS 1-99=OS 1-90=Other. %d sec left"):format(
+            LinkOf(item), item.count, state.index, #state.queue, item.count, state.duration))
+    else
+        Say(("Roll for %s (%d/%d): 1-100=MS 1-99=OS 1-90=Other. %d sec left"):format(
+            LinkOf(item), state.index, #state.queue, state.duration))
+    end
     runner:Show()
     Changed()
 end
 
--- The rolls are closed: pick the winner, or leave it to the master looter.
+-- Who wins now among the rolls not yet given a copy, and which equal rolls are contested.
+local function Settle()
+    local open = {}
+    for _, e in ipairs(state.ranking or {}) do
+        e.tied = false
+        if not e.assigned then open[#open + 1] = e end
+    end
+    local winners, contested, need = Plan(open, state.slots)
+    state.contested, state.need = contested, need
+    state.tie = contested ~= nil
+    state.pendingClear = #winners
+    if contested then
+        for _, e in ipairs(contested) do e.tied = true end
+    end
+    return winners
+end
+
+local function Unassigned()
+    local n = 0
+    for _, e in ipairs(state and state.ranking or {}) do
+        if not e.assigned then n = n + 1 end
+    end
+    return n
+end
+
+-- The rolls are closed: the best rolls win the copies (by themselves, or the master looter
+-- picks); equal rolls on the last copy are announced and re-rolled or decided by the master looter.
 local function CloseItem()
     state.phase = "decide"
-    local ranking, tied = Run.Ranking()
+    local ranking = Run.Ranking()
     state.ranking = ranking
     local link = LinkOf(state.item)
     if #ranking == 0 then
@@ -241,37 +344,64 @@ local function CloseItem()
         return
     end
     Say(("[CleanLoot] Rolls closed for %s."):format(link))
-    if tied > 1 then
+    local winners = Settle()
+    local contested, need = state.contested, state.need
+    local tieMessage
+    if contested then
         local names = {}
-        for _, e in ipairs(ranking) do
-            if e.tied then names[#names + 1] = ShortName(e.name) end
+        for _, e in ipairs(contested) do names[#names + 1] = ShortName(e.name) end
+        local roll = ("%s %d"):format(LABEL[contested[1].cat], contested[1].value)
+        if need > 1 then
+            tieMessage = ("[CleanLoot] Tie for the last %d copies of %s between %s (%s). The master looter decides."):format(
+                need, link, table.concat(names, ", "), roll)
+        else
+            tieMessage = ("[CleanLoot] Tie for %s between %s (%s). The master looter decides."):format(
+                link, table.concat(names, ", "), roll)
         end
-        state.tie = true
-        Say(("[CleanLoot] Tie for %s between %s (%s %d). The master looter decides."):format(link,
-            table.concat(names, ", "), LABEL[ranking[1].cat], ranking[1].value))
-    elseif CL.db.sessionAuto then
-        Run.Award(ranking[1].name)
-        return
     end
+    if CL.db.sessionAuto then
+        for _, e in ipairs(winners) do Run.Award(e.name) end
+    end
+    if tieMessage and state.phase == "decide" then Say(tieMessage) end
     Changed()
 end
 
--- Give the item in play to `name` (one of the rolls). Automatic, or the master looter's choice.
+-- Give the next copy of the item in play to `name` (one of the rolls). Automatic, or the master
+-- looter's choice.
 function Run.Award(name)
-    if not (state and state.phase == "decide") then return false end
+    if not (state and state.phase == "decide") or state.slots <= 0 then return false end
     local entry
     for _, e in ipairs(state.ranking or {}) do
-        if e.name == name then entry = e break end
+        if e.name == name and not e.assigned then entry = e break end
     end
     if not entry then return false end
-    state.awards[#state.awards + 1] = { item = state.item, winner = name, cat = entry.cat, value = entry.value }
-    if not state.test and state.item.guid then
-        CL.LootPool.SetAwarded(state.item.guid, name, LABEL[entry.cat] .. " " .. entry.value)
+    local item = state.item
+    local copy = (item.items and item.items[(item.count or 1) - state.slots + 1]) or item
+    entry.assigned = true
+    state.slots = state.slots - 1
+    state.awards[#state.awards + 1] = { item = item, copy = copy, winner = name, cat = entry.cat, value = entry.value,
+        entry = entry }
+    state.lotAwarded[#state.lotAwarded + 1] = ShortName(name)
+    if not state.test and copy.guid then
+        CL.LootPool.SetAwarded(copy.guid, name, LABEL[entry.cat] .. " " .. entry.value)
     end
-    Say(("[CleanLoot] %s assigned to %s for roll %s %d."):format(LinkOf(state.item), ShortName(name),
+    Say(("[CleanLoot] %s assigned to %s for roll %s %d."):format(LinkOf(item), ShortName(name),
         LABEL[entry.cat], entry.value))
-    state.awardedText = ("Assigned to %s (%s %d)."):format(ShortName(name), LABEL[entry.cat], entry.value)
-    Between()
+    if state.slots == 0 or Unassigned() == 0 then
+        if #state.lotAwarded == 1 then
+            state.awardedText = ("Assigned to %s (%s %d)."):format(ShortName(name), LABEL[entry.cat], entry.value)
+        else
+            state.awardedText = "Assigned to " .. table.concat(state.lotAwarded, ", ") .. "."
+        end
+        if state.slots > 0 then
+            state.awardedText = state.awardedText .. (" %d cop%s not given."):format(state.slots,
+                state.slots == 1 and "y" or "ies")
+        end
+        Between()
+    else
+        Settle()
+        Changed()
+    end
     return true
 end
 
@@ -289,8 +419,8 @@ function End(cancelled)
         local me = MyName()
         for _, a in ipairs(awards) do
             if not (me and ML.SameName(a.winner, me)) then
-                Whisper(a.winner, ("[CleanLoot] You won %s (%s %d). Come trade me for it."):format(
-                    LinkOf(a.item), LABEL[a.cat], a.value))
+                local roll = a.cat and (" (%s %d)"):format(LABEL[a.cat], a.value) or ""
+                Whisper(a.winner, ("[CleanLoot] You won %s%s. Come trade me for it."):format(LinkOf(a.item), roll))
             end
         end
     end
@@ -327,6 +457,9 @@ runner:SetScript("OnUpdate", function(_, elapsed)
     elseif state.phase == "between" then
         state.wait = state.wait - elapsed
         if state.wait <= 0 then Next() end
+    elseif state.phase == "review" then
+        state.reviewLeft = state.reviewLeft - elapsed
+        if state.reviewLeft <= 0 then End(false) end
     end
     if not state then return end
     state.tick = (state.tick or 0) + elapsed
@@ -352,9 +485,12 @@ function Run.CanStart()
 end
 
 local function Begin(items, test)
-    state = { queue = items, index = 0, test = test, awards = {}, duration = Run.Duration(), phase = "starting" }
-    Say(("[CleanLoot] Loot session: %d item%s, %d sec each. 1-100=MS 1-99=OS 1-90=Other"):format(
-        #items, #items == 1 and "" or "s", state.duration))
+    local lots = MakeLots(items)
+    state = { queue = lots, index = 0, test = test, awards = {}, history = {}, duration = Run.Duration(),
+        phase = "starting" }
+    local different = #lots ~= #items and (" (%d different)"):format(#lots) or ""
+    Say(("[CleanLoot] Loot session: %d item%s%s, %d sec each. 1-100=MS 1-99=OS 1-90=Other"):format(
+        #items, #items == 1 and "" or "s", different, state.duration))
     Next()
     return true
 end
@@ -424,6 +560,7 @@ end
 function Run.Skip()
     if not (state and (Rolling() or state.phase == "decide")) then return false end
     Say(("[CleanLoot] %s skipped."):format(LinkOf(state.item)))
+    state.ranking = state.ranking or Run.Ranking()
     state.awardedText = "Skipped."
     Between()
     return true
@@ -438,23 +575,133 @@ end
 
 -- After a tie: only the tied players roll again, in the range of their category.
 function Run.Reroll()
-    if not (state and state.phase == "decide" and state.tie) then return false end
-    local names, cat = {}, state.ranking[1].cat
-    local list = {}
-    for _, e in ipairs(state.ranking) do
-        if e.tied then
-            names[e.name] = true
-            list[#list + 1] = ShortName(e.name)
-        end
+    if not (state and state.phase == "decide" and state.tie and state.pendingClear == 0) then return false end
+    local names, list, cat = {}, {}, state.contested[1].cat
+    for _, e in ipairs(state.contested) do
+        names[e.name] = true
+        list[#list + 1] = ShortName(e.name)
     end
     state.restrict = { names = names, cat = cat }
-    state.rolls, state.passed, state.ranking, state.tie = {}, {}, nil, false
+    state.rolls, state.passed, state.ranking, state.tie, state.contested = {}, {}, nil, false, nil
     state.remaining = state.duration
     state.fired = {}
     state.phase = "rolling"
-    Say(("[CleanLoot] Re-roll for %s between %s: %s. %d sec left"):format(LinkOf(state.item),
-        table.concat(list, ", "), RangeText(cat), state.duration))
+    local copies = state.slots > 1 and (" (%d copies to give)"):format(state.slots) or ""
+    Say(("[CleanLoot] Re-roll for %s between %s: %s%s. %d sec left"):format(LinkOf(state.item),
+        table.concat(list, ", "), RangeText(cat), copies, state.duration))
     Changed()
+    return true
+end
+
+-- The master looter rolls too: his buttons make the game's own /roll, which the session reads
+-- like everybody's (a test session has no real roll, so it makes one up).
+local function MyRollName()
+    local me = MyName()
+    if me and state then
+        for name in pairs(state.rolls) do
+            if ML.SameName(name, me) then return name end
+        end
+    end
+    return me or "You"
+end
+
+function Run.RollAs(cat)
+    if not (state and state.phase == "rolling") or not RANGE[cat] then return false end
+    local high = RANGE[cat]
+    if state.test then
+        Run.HandleRoll(MyName() or "You", math.random(1, high), 1, high)
+    else
+        local ok, err = pcall(RandomRoll, 1, high)
+        if not ok then
+            CL.Print("could not roll: " .. tostring(err))
+            return false
+        end
+    end
+    return true
+end
+
+function Run.PassMe()
+    if not (state and state.phase == "rolling") then return false end
+    return Run.Pass(MyRollName())
+end
+
+-- After the last item the session waits a little so assignments can be changed; this ends it now.
+function Run.Finish()
+    if not (state and state.phase == "review") then return false end
+    End(false)
+    return true
+end
+
+-- The items done so far: { { lot, ranking }, ... }.
+function Run.History() return state and state.history or {} end
+
+function Run.AwardsFor(lot)
+    local list = {}
+    for _, a in ipairs(state and state.awards or {}) do
+        if a.item == lot then list[#list + 1] = a end
+    end
+    return list
+end
+
+function Run.FreeCopies(lot)
+    return (lot.count or 1) - #Run.AwardsFor(lot)
+end
+
+-- An item can be changed once it is done, never while it is being rolled for.
+function Run.CanEdit(lot)
+    if not (state and lot) then return false end
+    if state.item == lot and (state.phase == "rolling" or state.phase == "paused" or state.phase == "decide") then
+        return false
+    end
+    return true
+end
+
+local function Touched()
+    if state and state.phase == "review" then state.reviewLeft = REVIEW_WAIT end   -- the master looter is still on it
+    Changed()
+end
+
+-- Take an assignment back: the copy is free again.
+function Run.Unassign(award)
+    if not state then return false end
+    for i, a in ipairs(state.awards) do
+        if a == award then
+            if not Run.CanEdit(award.item) then return false end
+            table.remove(state.awards, i)
+            if award.entry then award.entry.assigned = false end
+            if not state.test and award.copy and award.copy.guid then CL.LootPool.ClearAwarded(award.copy.guid) end
+            Say(("[CleanLoot] %s is no longer assigned to %s."):format(LinkOf(award.item), ShortName(award.winner)))
+            Touched()
+            return true
+        end
+    end
+    return false
+end
+
+-- Give a free copy of a finished item to `name` by hand: one of its rolls (`entry`) or anybody.
+function Run.AssignManual(lot, name, entry)
+    if not (state and lot and Run.CanEdit(lot)) then return false end
+    name = type(name) == "string" and name:gsub("^%s+", ""):gsub("%s+$", "") or ""
+    if name == "" then return false end
+    local used = {}
+    for _, a in ipairs(Run.AwardsFor(lot)) do used[a.copy] = true end
+    local copy
+    for _, c in ipairs(lot.items or { lot }) do
+        if not used[c] then copy = c break end
+    end
+    if not copy then return false end
+    state.awards[#state.awards + 1] = { item = lot, copy = copy, winner = name, cat = entry and entry.cat or nil,
+        value = entry and entry.value or nil, entry = entry }
+    if entry then entry.assigned = true end
+    if not state.test and copy.guid then
+        CL.LootPool.SetAwarded(copy.guid, name, entry and (LABEL[entry.cat] .. " " .. entry.value) or "by hand")
+    end
+    if entry then
+        Say(("[CleanLoot] %s assigned to %s for roll %s %d."):format(LinkOf(lot), ShortName(name), LABEL[entry.cat], entry.value))
+    else
+        Say(("[CleanLoot] %s assigned to %s."):format(LinkOf(lot), ShortName(name)))
+    end
+    Touched()
     return true
 end
 
@@ -462,12 +709,14 @@ end
 function Run.Can(action)
     if not state then return false end
     if action == "cancel" then return true end
+    if action == "roll" or action == "pass" then return state.phase == "rolling" end
+    if action == "finish" then return state.phase == "review" end
     if action == "pause" then return state.phase == "rolling" end
     if action == "resume" then return state.phase == "paused" end
     if action == "extend" then return Rolling() and true or false end
     if action == "skip" then return (Rolling() or state.phase == "decide") and true or false end
-    if action == "reroll" then return state.phase == "decide" and state.tie end
-    if action == "choose" then return state.phase == "decide" and #(state.ranking or {}) > 0 end
+    if action == "reroll" then return state.phase == "decide" and state.tie and state.pendingClear == 0 end
+    if action == "choose" then return state.phase == "decide" and state.slots > 0 and Unassigned() > 0 end
     return false
 end
 

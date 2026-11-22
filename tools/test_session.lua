@@ -147,8 +147,9 @@ WOW.Advance(1.2)
 check(sentHas("Rolls closed for") and sentHas("assigned to Teki La for roll MS 44"), "the rolls close and the best MS roll wins (" .. table.concat(sentTexts(), " | ") .. ")")
 check(sentCount("sec left") == 0, "no reminder after the countdown")
 WOW.Advance(3.5)
-check(sentHas("Session over: 1 item assigned"), "the session ends once the last item is done")
-check(not Run.Active(), "...and is no longer running")
+check(Run.State().phase == "review", "after the last item the session waits, so an assignment can be changed")
+check(Run.Finish() == true and sentHas("Session over: 1 item assigned"), "Finish ends the session")
+check(not Run.Active(), "...and it is no longer running")
 local whisper
 for _, s in ipairs(sent) do if s.channel == "WHISPER" then whisper = s end end
 check(whisper and whisper.target == "Teki La" and whisper.msg:find("You won", 1, true) and whisper.msg:find("[Test Blade]", 1, true)
@@ -303,6 +304,7 @@ WOW.Advance(3.5)
 roll("Hazas War", 99)
 WOW.Advance(31)
 WOW.Advance(3.5)
+Run.Finish()
 WOW.Advance(3)
 local per = {}
 for _, s in ipairs(sent) do if s.channel == "WHISPER" then per[s.target] = (per[s.target] or 0) + 1 end end
@@ -312,8 +314,10 @@ CL.db.sessionWhisper = false
 Run.Start()
 roll("Teki La", 80)
 WOW.Advance(31)
-WOW.Advance(8)
-check(sentCount("Come trade me") == 0, "whispers off: none")
+WOW.Advance(4)
+Run.Finish()
+WOW.Advance(4)
+check(sentCount("Come trade me") == 0 and sentHas("Session over"), "whispers off: none")
 
 -- 11. Alone and in a party
 reset()
@@ -328,7 +332,9 @@ check(#sent == 0 and sayMatches("Loot session: 1 item"), "alone nothing is sent,
 roll("Hazas War", 55)
 WOW.Advance(31)
 check(sayMatches("assigned to Hazas War for roll MS 55"), "alone you can roll and win: that is how to try it")
-WOW.Advance(8)
+WOW.Advance(4)
+Run.Finish()
+WOW.Advance(4)
 check(#sent == 0, "...and no whisper goes to yourself")
 inGroup, inRaid = true, true
 
@@ -338,6 +344,10 @@ check(Run.StartTest() == true and Run.State().test, "a test session starts")
 check(#sent == 0 and sayMatches("Loot session:"), "it is only printed to you")
 WOW.Advance(35)
 WOW.Advance(8)
+WOW.Advance(35)
+WOW.Advance(8)
+Run.Finish()
+WOW.Advance(4)
 check(#sent == 0, "a test session sends nothing to the group, whispers included")
 check(sayMatches("assigned to"), "...yet it runs: the made-up players roll and somebody wins")
 Run.Cancel()
@@ -410,6 +420,202 @@ SlashCmdList.CLEANLOOT("session stop")
 check(sayMatches("no session is running"), "(and says so when none runs)")
 SlashCmdList.CLEANLOOT("session test")
 check(Run.Active() and Run.State().test, "/cll session test starts a test")
+Run.Cancel()
+
+
+-- 16. Identical items: one roll, the best rolls win the copies
+local function dupLink(id, name, uniq, bonus)
+    return ("|cffa335ee|Hitem:%d:::::::%s:60:1491::1::1:%d:5242:::::|h[%s]|h|r"):format(id, uniq or "", bonus or 28, name)
+end
+check(Run.ItemKey(dupLink(100, "A", "11")) == Run.ItemKey(dupLink(100, "A", "99")), "two copies differing only by the unique id are identical")
+check(Run.ItemKey(dupLink(100, "A")) ~= Run.ItemKey(dupLink(100, "A", "", 29)), "a different bonus is a different item")
+check(Run.ItemKey(dupLink(100, "A")) ~= Run.ItemKey(dupLink(101, "A")), "...and so is another item")
+local function stockDup(n, extra)
+    CL.db.pool = {}
+    for i = 1, n do
+        CL.db.pool["D" .. i] = { itemID = 100, link = dupLink(100, "Twin Blade", tostring(i)), seen = serverTime - i,
+            expires = serverTime + 3600 + i, quality = 4 }
+    end
+    if extra then
+        CL.db.pool["X1"] = { itemID = 200, link = dupLink(200, "Lone Ring"), seen = serverTime - 99, expires = serverTime + 9000, quality = 4 }
+    end
+end
+local function resetDup(n, extra)
+    reset()
+    stockDup(n, extra)
+end
+
+resetDup(3, true)
+Run.Start()
+check(sent[1].msg:find("4 items (2 different)", 1, true), "the start message counts the copies and the different items (" .. sent[1].msg .. ")")
+check(sent[2].msg:find("x3 (1/2)", 1, true) and sent[2].msg:find("the 3 best rolls win", 1, true),
+    "three identical items are one roll: x3, the 3 best win (" .. sent[2].msg .. ")")
+roll("A One", 90) roll("B Two", 80) roll("C Three", 70) roll("D Four", 60) roll("E Five", 50)
+WOW.Advance(31)
+check(sentCount("assigned to") == 3 and sentHas("assigned to A One") and sentHas("assigned to B Two") and sentHas("assigned to C Three"),
+    "the three best rolls win a copy each")
+check(not sentHas("assigned to D Four") and not sentHas("assigned to E Five"), "...and nobody else")
+check(CL.db.pool.D1.awardedTo == "A One" and CL.db.pool.D2.awardedTo == "B Two" and CL.db.pool.D3.awardedTo == "C Three",
+    "each winner gets a different copy, oldest first")
+check(Run.State().phase == "between", "(the next item follows)")
+WOW.Advance(3.5)
+check(sentHas("[Lone Ring]") and sentHas("(2/2)"), "then the other item")
+Run.Cancel()
+
+-- a tie on the last copy
+resetDup(2)
+Run.Start()
+roll("A One", 90) roll("B Two", 50) roll("C Three", 50)
+WOW.Advance(31)
+check(sentHas("assigned to A One") and sentHas("Tie for") and sentHas("B Two, C Three") and not sentHas("assigned to B Two"),
+    "the clear winner gets a copy, the tie on the last copy is announced (" .. table.concat(sentTexts(), " | ") .. ")")
+check(Run.State().tie and Run.Can("reroll"), "the master looter can re-roll it")
+Run.Reroll()
+roll("B Two", 70) roll("C Three", 30) roll("A One", 99)
+WOW.Advance(31)
+check(sentHas("assigned to B Two for roll MS 70") and not sentHas("assigned to C Three"), "the re-roll decides the last copy among the tied only")
+Run.Cancel()
+
+-- a tie across several copies
+resetDup(3)
+Run.Start()
+roll("A One", 90) roll("B Two", 50) roll("C Three", 50) roll("D Four", 50)
+WOW.Advance(31)
+check(sentHas("Tie for the last 2 copies"), "a tie for several copies says how many (" .. table.concat(sentTexts(), " | ") .. ")")
+sent = {}
+Run.Reroll()
+check(sentHas("(2 copies to give)"), "...and so does the re-roll")
+roll("B Two", 80) roll("C Three", 60) roll("D Four", 10)
+WOW.Advance(31)
+check(sentHas("assigned to B Two") and sentHas("assigned to C Three") and not sentHas("assigned to D Four"),
+    "the two best of the re-roll take the last two copies")
+Run.Cancel()
+
+-- fewer rolls than copies
+resetDup(3)
+Run.Start()
+roll("A One", 90) roll("B Two", 20)
+WOW.Advance(31)
+check(sentCount("assigned to") == 2, "two rolls for three copies: two are given")
+check(Run.State().awardedText:find("1 copy not given", 1, true), "...and the third is reported as not given (" .. tostring(Run.State().awardedText) .. ")")
+Run.Cancel()
+
+-- the master looter picks, copy by copy
+resetDup(2)
+CL.db.sessionAuto = false
+Run.Start()
+roll("A One", 90) roll("B Two", 50) roll("C Three", 50)
+WOW.Advance(31)
+check(not sentHas("assigned to") and Run.Can("choose"), "automatic off: nothing is given by itself")
+check(Run.Can("reroll") == false, "no re-roll while a clear winner is still to be assigned")
+check(Run.Award("A One") and Run.State().slots == 1, "the first pick takes a copy")
+check(Run.Can("reroll"), "...then the tie on the last copy can be re-rolled")
+check(Run.Award("B Two") and Run.State().phase == "between", "the second pick takes the last one")
+check(Run.Award("C Three") == false, "(no copy left)")
+Run.Cancel()
+
+-- 17. Taking back an assignment, or giving one by hand
+resetDup(0)
+stock({ { id = 300, name = "First" }, { id = 301, name = "Second" } })
+Run.Start()
+roll("Teki La", 80)
+WOW.Advance(31)
+WOW.Advance(3.5)
+roll("Iso Tope", 60)
+local lot1 = Run.History()[1].lot
+check(#Run.History() == 1 and Run.CanEdit(lot1), "an item that is done can be changed")
+check(not Run.CanEdit(Run.State().item), "...the one being rolled for cannot")
+local award = Run.AwardsFor(lot1)[1]
+sent = {}
+check(Run.Unassign(award) == true and sentHas("is no longer assigned to Teki La"), "taking an assignment back tells the group")
+check(CL.db.pool.G1.awardedTo == nil and Run.FreeCopies(lot1) == 1 and #Pool.Offered() >= 1, "...the copy is free and offered again")
+check(Run.AssignManual(lot1, "  Zed Zeta ") == true and sentHas("assigned to Zed Zeta."), "a copy can be given by hand to anybody")
+check(Run.AwardsFor(lot1)[1].winner == "Zed Zeta" and CL.db.pool.G1.awardedTo == "Zed Zeta", "...and is recorded")
+check(Run.AssignManual(lot1, "Another") == false, "no free copy left")
+check(Run.AssignManual(lot1, "   ") == false, "an empty name is refused")
+check(Run.AssignManual(Run.State().item, "Zed Zeta") == false, "the item in play cannot be changed")
+WOW.Advance(31)
+WOW.Advance(3.5)
+check(Run.State().phase == "review", "after the last item the session waits for changes")
+local before = Run.State().reviewLeft
+WOW.Advance(20)
+Run.Unassign(Run.AwardsFor(Run.History()[2].lot)[1])
+check(Run.State().reviewLeft > before - 1, "a change gives the master looter more time")
+sent = {}
+WOW.Advance(31)
+check(not Run.Active() and sentHas("Session over"), "the session ends by itself when the time is up")
+local whispers = {}
+for _, sm in ipairs(sent) do if sm.channel == "WHISPER" then whispers[#whispers + 1] = sm end end
+check(#whispers == 1 and whispers[1].target == "Zed Zeta" and whispers[1].msg:find("You won", 1, true)
+    and not whispers[1].msg:find("(", 1, true), "a copy given by hand is whispered, with no roll in the message (" .. tostring(whispers[1] and whispers[1].msg) .. ")")
+
+-- 18. The master looter rolls too
+local rolled = {}
+function RandomRoll(lo, hi) rolled[#rolled + 1] = { lo, hi } end
+reset()
+check(Run.RollAs(1) == false, "no session: no roll")
+Run.Start()
+check(Run.RollAs(1) and Run.RollAs(2) and Run.RollAs(3), "the master looter can roll")
+check(#rolled == 3 and rolled[1][2] == 100 and rolled[2][2] == 99 and rolled[3][2] == 90 and rolled[1][1] == 1, "...with the three ranges")
+roll("Hazas War", 40)
+check(Run.PassMe() and #Run.Ranking() == 0, "he can pass too: his roll is cancelled")
+roll("Hazas War", 55)
+WOW.Advance(31)
+check(sentHas("assigned to Hazas War for roll MS 55"), "he can win an item himself")
+Run.Cancel()
+rolled = {}
+Run.StartTest()
+Run.RollAs(2)
+check(#rolled == 0 and #Run.Ranking() >= 1, "in a test session his roll is made up, not sent to the game")
+Run.Cancel()
+
+-- 19. One colour per kind of roll
+local c1, c2, c3 = Run.CatColor(1), Run.CatColor(2), Run.CatColor(3)
+check(c1 ~= "" and c1 ~= c2 and c2 ~= c3 and c1 ~= c3, "MS, OS and Other have their own colours")
+
+-- 20. The window: the icons at the side, the changes, the master looter's buttons
+resetDup(0)
+stock({ { id = 300, name = "First" }, { id = 301, name = "Second" } })
+Session.Open()
+win = Session.Window()
+win.start.__scripts.OnClick(win.start)
+check(win.rollButtons[1]:IsShown() and win.rollButtons.pass:IsShown(), "the session view has the master looter's roll buttons")
+rolled = {}
+win.rollButtons[2].__scripts.OnClick(win.rollButtons[2])
+check(#rolled == 1 and rolled[1][2] == 99, "a button rolls in its range")
+roll("Teki La", 80)
+roll("Iso Tope", 30, 99)
+WOW.Advance(0.3)
+local rows = {}
+for _, row in ipairs(win.runRows) do if row.entry then rows[#rows + 1] = row end end
+check(rows[1].roll:GetText():find(c1, 1, true) and rows[2].roll:GetText():find(c2, 1, true), "each roll shows in its colour")
+check(win.strip:IsShown() and win.strip.buttons[1]:IsShown() and win.strip.buttons[1].data.live, "the item in play has its icon at the side")
+WOW.Advance(31)
+WOW.Advance(3.5)
+check(win.strip.buttons[1].data.index == 1 and not win.strip.buttons[1].data.live and win.strip.buttons[2].data.live,
+    "a finished item keeps an icon, the one in play has its own")
+win.strip.buttons[1].__scripts.OnClick(win.strip.buttons[1])
+check(win.editIndex == 1 and win.backButton:IsShown() and not win.controls.pause:IsShown(), "a click on an icon goes back to that item")
+local erows = {}
+for _, row in ipairs(win.runRows) do if row.entry or row.award then erows[#erows + 1] = row end end
+check(#erows == 2 and erows[1].award and erows[1].cancel:IsShown() and not erows[2].award, "its rolls show who got a copy, with an X to take it back")
+erows[1].cancel.__scripts.OnClick(erows[1].cancel)
+local box = ML.Confirm()
+check(box:IsShown() and box.text:GetText():find("Take First back from Teki La", 1, true), "the X asks before taking back")
+box.give.__scripts.OnClick(box.give)
+check(Run.FreeCopies(Run.History()[1].lot) == 1, "...and does")
+erows = {}
+for _, row in ipairs(win.runRows) do if row.entry or row.award then erows[#erows + 1] = row end end
+erows[2].__scripts.OnClick(erows[2])
+box = ML.Confirm()
+check(box:IsShown() and box.text:GetText():find("Give First to Iso Tope", 1, true), "a click on a name offers to give it the copy")
+box.give.__scripts.OnClick(box.give)
+check(Run.AwardsFor(Run.History()[1].lot)[1].winner == "Iso Tope", "...and does")
+win.manualBox:SetText("Zed Zeta")
+win.manualAssign.__scripts.OnClick(win.manualAssign)
+check(not win.manualAssign:IsEnabled() or Run.FreeCopies(Run.History()[1].lot) == 0, "a copy by hand needs a free copy")
+win.backButton.__scripts.OnClick(win.backButton)
+check(win.editIndex == nil and win.controls.pause:IsShown(), "Back returns to the session")
 Run.Cancel()
 
 -- 15. The options
