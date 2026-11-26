@@ -44,7 +44,7 @@ check(not f.buttons[1].art:IsShown() and not f.slot:IsShown(), "...with no class
 RF.SetSkin("blizzard")
 check(CL.db.rollSkin == "blizzard" and RF.Skin() == "blizzard", "the choice is saved")
 check(f.skin == "blizzard" and f:GetWidth() == 262 and f:GetHeight() == 84, "an open frame takes the classic size")
-check(f.slot:IsShown(), "the icon gets its slot")
+check(f.slot:IsShown() and f.slot.outline:IsShown(), "the icon gets its coloured frame")
 for _, t in ipairs(ORDER) do
     local b = f.buttons[t]
     check(b.art:IsShown() and not b.label:IsShown() and b:GetWidth() == 28, "button " .. t .. " is the classic picture, with no label")

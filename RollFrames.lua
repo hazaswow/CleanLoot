@@ -77,7 +77,7 @@ local function PaintQuality(f)
     f.name:SetTextColor(r, g, b)
     if Skin() == "blizzard" then
         f:SetBackdropBorderColor(1, 1, 1, 1)
-        f.slot:SetVertexColor(r, g, b)
+        f.slot:SetBackdropBorderColor(r, g, b, 1)
     else
         f:SetBackdropBorderColor(r, g, b, 1)
     end
@@ -311,11 +311,23 @@ local function CreateRollFrame(index)
     icon.tex = icon:CreateTexture(nil, "ARTWORK")
     icon.tex:SetAllPoints()
     icon.tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-    icon.slot = icon:CreateTexture(nil, "OVERLAY")   -- the classic skin's slot around the icon
-    icon.slot:SetTexture("Interface\\Buttons\\UI-Quickslot2")
-    icon.slot:SetPoint("CENTER", icon, "CENTER", 0, -1)
-    icon.slot:Hide()
-    f.slot = icon.slot
+    -- the classic skin's frame around the icon: a clean border in the quality colour, with a dark
+    -- line outside it so it reads against the dialog border
+    local slot = CreateFrame("Frame", nil, f, "BackdropTemplate")
+    slot:SetFrameLevel(icon:GetFrameLevel() + 2)
+    slot:SetPoint("TOPLEFT", icon, "TOPLEFT", -2, 2)
+    slot:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", 2, -2)
+    slot:SetBackdrop({ edgeFile = FLAT, edgeSize = 2 })
+    local outline = CreateFrame("Frame", nil, f, "BackdropTemplate")
+    outline:SetFrameLevel(icon:GetFrameLevel() + 1)
+    outline:SetPoint("TOPLEFT", icon, "TOPLEFT", -3, 3)
+    outline:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", 3, -3)
+    outline:SetBackdrop({ edgeFile = FLAT, edgeSize = 1 })
+    outline:SetBackdropBorderColor(0, 0, 0, 1)
+    slot.outline = outline
+    slot:Hide()
+    outline:Hide()
+    f.slot = slot
     icon.count = icon:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
     icon.count:SetPoint("BOTTOMRIGHT", -2, 2)
     icon:SetScript("OnEnter", function(self)
@@ -467,19 +479,21 @@ function RF.ApplySkin(f)
     f.watch:SetPoint("TOPLEFT", f, "TOPLEFT", inset, -inset)
     f.watch:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -inset, inset)
 
-    f.icon:SetSize(classic and 40 or 36, classic and 40 or 36)
+    f.icon:SetSize(classic and 38 or 36, classic and 38 or 36)
     f.icon:ClearAllPoints()
-    f.icon:SetPoint("TOPLEFT", f, "TOPLEFT", classic and 16 or 8, classic and -14 or -8)
-    f.slot:SetSize(classic and 73 or 66, classic and 73 or 66)
+    f.icon:SetPoint("TOPLEFT", f, "TOPLEFT", classic and 19 or 8, classic and -17 or -8)
     f.slot:SetShown(classic)
+    f.slot.outline:SetShown(classic)
 
     f.name:ClearAllPoints()
     if classic then
-        f.name:SetPoint("TOPLEFT", f, "TOPLEFT", 62, -16)
+        f.name:SetPoint("TOPLEFT", f, "TOPLEFT", 66, -17)
     else
         f.name:SetPoint("TOPLEFT", f.icon, "TOPRIGHT", 6, -2)
     end
-    f.name:SetSize(classic and 159 or 156, 14)
+    f.name:SetSize(classic and 155 or 156, 14)
+    local font, size = f.name:GetFont()   -- an outline keeps the quality colour readable on the dialog's backdrop
+    if font then f.name:SetFont(font, size, classic and "OUTLINE" or "") end
 
     f.note:ClearAllPoints()
     f.note:SetPoint("TOPLEFT", f, "TOPLEFT", classic and 17 or 50, classic and -76 or -43)
@@ -506,7 +520,7 @@ function RF.ApplySkin(f)
         b:ClearAllPoints()
         if classic then
             b:SetSize(28, 28)
-            if prev then b:SetPoint("LEFT", prev, "RIGHT", 6, 0) else b:SetPoint("TOPLEFT", f, "TOPLEFT", 62, -32) end
+            if prev then b:SetPoint("LEFT", prev, "RIGHT", 6, 0) else b:SetPoint("TOPLEFT", f, "TOPLEFT", 66, -33) end
             b:SetBackdrop(nil)
         else
             b:SetSize(72, 20)
