@@ -8,12 +8,17 @@ local _, CL = ...
 local W = {}
 CL.LootWindow = W
 
-local WIN_W, WIN_H = 640, 414
-local TOP = 54
-local LEFT_W = 190
-local TREE_ROWS, TREE_H = 14, 22
-local LIST_ROWS, LIST_H = 8, 38
-local LIST_W = 396
+local WIN_W, WIN_H = 580, 342
+local TOP = 68
+local LEFT_W = 150
+local TREE_ROWS, TREE_H = 12, 20
+local LIST_ROWS, LIST_H = 10, 24
+local LIST_W = 388
+-- the columns of a drop (x in the row, width): item, kind of roll, the roll, the winner
+local COL_ITEM, COL_ITEM_W = 32, 166
+local COL_KIND, COL_KIND_W = 204, 56
+local COL_ROLL, COL_ROLL_W = 262, 30
+local COL_WHO, COL_WHO_W = 300, 86
 local FLAT = "Interface\\Buttons\\WHITE8X8"
 local BACKDROP = {
     bgFile = FLAT, edgeFile = FLAT, edgeSize = 1,
@@ -72,6 +77,24 @@ function W.WinnerText(e)
     return GREY .. "No winner|r"
 end
 
+-- The three columns of a drop: the kind of roll, the roll, who got it.
+function W.Columns(e)
+    local w = e.winner
+    if not w then
+        if e.allPassed then return "Pass", "", GREY .. "Everybody|r" end
+        return "", "", GREY .. "-|r"
+    end
+    local kind, value
+    if w.label then
+        kind, value = w.label:match("^(%S+) (%d+)$")
+        if not kind then kind, value = w.label, "" end
+    else
+        kind = w.type and CL.ROLL_NAME and CL.ROLL_NAME[w.type] or ""
+        value = w.value and tostring(w.value) or ""
+    end
+    return kind, value, WhoText(w)
+end
+
 local function Age(t)
     local d = (GetServerTime and GetServerTime() or time()) - (t or 0)
     if d < 60 then return "now" end
@@ -95,6 +118,7 @@ local function Tooltip(owner, e)
     if not ok then GameTooltip:SetText(e.name or "?") end
     GameTooltip:AddLine(" ")
     GameTooltip:AddLine(("%s - %s  (%s ago)"):format(e.instance or "?", e.boss or "?", Age(e.t)), 0.7, 0.7, 0.7)
+    GameTooltip:AddLine(W.WinnerText(e), 1, 1, 1)
     if e.rolls and #e.rolls > 0 then
         GameTooltip:AddLine("Rolls", 1, 0.82, 0)
         for _, r in ipairs(e.rolls) do
@@ -206,9 +230,10 @@ local function RefreshList()
             row.border:SetColorTexture(r or 1, g or 1, b or 1, 1)
             row.name:SetText(e.name or "?")
             row.name:SetTextColor(r or 1, g or 1, b or 1)
-            row.line:SetText(W.WinnerText(e))
-            row.where:SetText(("%s%s|r"):format(GREY, state.sel and state.sel.boss and "" or (e.boss or "")))
-            row.age:SetText(Age(e.t))
+            local kind, value, who = W.Columns(e)
+            row.kind:SetText(GREY .. kind .. "|r")
+            row.roll:SetText(value)
+            row.who:SetText(who)
         end
     end
     Thumb(win.listBar, state.listOff, #shown, LIST_ROWS)
@@ -333,10 +358,21 @@ local function Create()
 
     ---------------- the drops of the selection
     f.heading = f:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    f.heading:SetPoint("TOPLEFT", f, "TOPLEFT", LEFT_W + 22, -34)
+    f.heading:SetPoint("TOPLEFT", f, "TOPLEFT", LEFT_W + 22, -32)
     f.heading:SetJustifyH("LEFT")
     f.count = f:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-    f.count:SetPoint("TOPRIGHT", f, "TOPRIGHT", -22, -36)
+    f.count:SetPoint("TOPRIGHT", f, "TOPRIGHT", -22, -34)
+    local function Header(text, x, w, justify)
+        local h = f:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+        h:SetPoint("TOPLEFT", f, "TOPLEFT", LEFT_W + 20 + x, -TOP + 14)
+        h:SetWidth(w)
+        h:SetJustifyH(justify or "LEFT")
+        h:SetText(text)
+    end
+    Header("Item", COL_ITEM, COL_ITEM_W)
+    Header("Roll", COL_KIND, COL_KIND_W)
+    Header("", COL_ROLL, COL_ROLL_W, "RIGHT")
+    Header("Winner", COL_WHO, COL_WHO_W)
 
     local right = Panel(f, LEFT_W + 20, -TOP, LIST_W + 12, LIST_ROWS * LIST_H)
     right:EnableMouseWheel(true)
@@ -347,7 +383,7 @@ local function Create()
     f.listBar = Scrollbar(right, LIST_W + 5, 0, LIST_ROWS * LIST_H)
     f.empty = right:CreateFontString(nil, "ARTWORK", "GameFontDisable")
     f.empty:SetPoint("CENTER", right, "CENTER", 0, 0)
-    f.empty:SetWidth(LIST_W - 40)
+    f.empty:SetWidth(LIST_W - 60)
     f.empty:SetText("Nothing here yet. Rolls the game decides, items handed out and loot session awards are listed as they happen.")
     f.listRows = {}
     for i = 1, LIST_ROWS do
@@ -358,27 +394,24 @@ local function Create()
         hover:SetAllPoints()
         hover:SetColorTexture(1, 1, 1, 0.06)
         row.border = row:CreateTexture(nil, "BACKGROUND")
-        row.border:SetSize(30, 30)
-        row.border:SetPoint("LEFT", row, "LEFT", 5, 0)
+        row.border:SetSize(22, 22)
+        row.border:SetPoint("LEFT", row, "LEFT", 4, 0)
         row.icon = row:CreateTexture(nil, "ARTWORK")
-        row.icon:SetSize(28, 28)
+        row.icon:SetSize(20, 20)
         row.icon:SetPoint("CENTER", row.border, "CENTER", 0, 0)
         row.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-        row.name = row:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
-        row.name:SetPoint("TOPLEFT", row, "TOPLEFT", 42, -5)
-        row.name:SetWidth(LIST_W - 120)
-        row.name:SetJustifyH("LEFT")
-        row.name:SetWordWrap(false)
-        row.line = row:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-        row.line:SetPoint("TOPLEFT", row, "TOPLEFT", 42, -21)
-        row.line:SetWidth(LIST_W - 60)
-        row.line:SetJustifyH("LEFT")
-        row.line:SetWordWrap(false)
-        row.age = row:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-        row.age:SetPoint("TOPRIGHT", row, "TOPRIGHT", -6, -6)
-        row.where = row:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-        row.where:SetPoint("TOPRIGHT", row, "TOPRIGHT", -44, -6)
-        row.where:SetJustifyH("RIGHT")
+        local function Cell(font, x, w, justify)
+            local c = row:CreateFontString(nil, "ARTWORK", font)
+            c:SetPoint("LEFT", row, "LEFT", x, 0)
+            c:SetWidth(w)
+            c:SetJustifyH(justify or "LEFT")
+            c:SetWordWrap(false)
+            return c
+        end
+        row.name = Cell("GameFontHighlight", COL_ITEM, COL_ITEM_W)
+        row.kind = Cell("GameFontHighlightSmall", COL_KIND, COL_KIND_W)
+        row.roll = Cell("GameFontHighlightSmall", COL_ROLL, COL_ROLL_W, "RIGHT")
+        row.who = Cell("GameFontHighlightSmall", COL_WHO, COL_WHO_W)
         row:SetScript("OnEnter", function(self) if self.entry then Tooltip(self, self.entry) end end)
         row:SetScript("OnLeave", function() GameTooltip:Hide() end)
         row:SetScript("OnClick", function(self)
@@ -405,7 +438,7 @@ local function Create()
     f.total = f:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
     f.total:SetPoint("BOTTOM", f, "BOTTOM", 0, 14)
     local erase = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-    erase:SetSize(90, 22)
+    erase:SetSize(80, 20)
     erase:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -10, 10)
     erase:SetText("Erase all")
     erase:SetScript("OnClick", function()

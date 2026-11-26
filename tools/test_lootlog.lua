@@ -210,10 +210,17 @@ w.mineCheck.__scripts.OnClick(w.mineCheck)
 -- the lines
 local function row(name) for _, r in ipairs(w.listRows) do if r.entry and r.entry.name == name then return r end end end
 w.treeRows[1].__scripts.OnClick(w.treeRows[1])
-check(row("Ephemeral Choker").line:GetText():find("Won by", 1, true) and row("Ephemeral Choker").line:GetText():find("Teki La", 1, true)
-    and row("Ephemeral Choker").line:GetText():find("Need 87", 1, true), "a drop says who won it and with what roll")
-check(row("Kindlegem Girdle").line:GetText():find("You", 1, true), "a drop I won says 'You'")
-check(row("Armor of the Fang").line:GetText():find("Everybody passed", 1, true), "a drop everybody passed on says so")
+local ch = row("Ephemeral Choker")
+check(ch.kind:GetText():find("Need", 1, true) and ch.roll:GetText() == "87" and ch.who:GetText():find("Teki La", 1, true),
+    "a drop shows the kind of roll, the roll and the winner in their own columns")
+check(row("Kindlegem Girdle").who:GetText():find("You", 1, true), "a drop I won says 'You'")
+local ap = row("Armor of the Fang")
+check(ap.kind:GetText():find("Pass", 1, true) and ap.who:GetText():find("Everybody", 1, true) and ap.roll:GetText() == "",
+    "a drop everybody passed on says so")
+local k, v = Win.Columns({ winner = { name = "A B", label = "MS 54" }, source = "session" })
+check(k == "MS" and v == "54", "a session award's label is split into kind and roll")
+k, v = Win.Columns({ winner = { name = "A B", label = "to disenchant" }, source = "session" })
+check(k == "to disenchant" and v == "", "...and a label without a roll stays whole")
 check(Win.WinnerText({ winner = { name = "A B", label = "to disenchant" }, source = "session" }):find("Given to", 1, true), "a hand-out says 'Given to'")
 
 -- the tooltip
