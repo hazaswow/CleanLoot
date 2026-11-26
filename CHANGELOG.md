@@ -17,7 +17,7 @@
 - The master loot settings have their own tabs in the options window: *Master loot* and *Disenchanter*.
 
 **A loot record window, in place of the game's Loot Rolls window** (`/loot` or `/cll history`)
-- Who won what, picked by **instance**, by **boss**, or all of it: the item, the winner and the roll, with every roll of the drop in the tooltip. Shift-click links an item in the chat, and a box keeps only what you won.
+- Who won what, picked by **instance**, by **boss**, or all of it: one line per item with the kind of roll, the roll and the winner. A click opens the list of the players who rolled for it (and the passes), Ctrl-click shows its look in the dressing room, Shift-click links it in the chat, and a box keeps only what you won.
 - CleanLoot keeps the record itself, because the game's own history is lost with each group: every roll the game decides, every item you hand out as master looter, and every loot session award.
 - The game's window no longer pops up on every drop (an option gives it back). The minimap button's left click opens the new one. A new *Loot record* tab in the options (how many entries to keep).
 
