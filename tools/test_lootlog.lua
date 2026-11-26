@@ -146,6 +146,9 @@ check(Log.Count() == 0, "erasing empties the record")
 where = { name = "Hall of Thanes", kind = "party" }
 serverTime = serverTime + 100
 result(1, 270227, "Ephemeral Choker", won("Teki La", "MAGE", 1, 87))
+results[1].rolls = { { name = "Teki La", class = "MAGE", type = 1, value = 87, isWinner = true },
+    { name = "Hazas War", class = "DRUID", type = 2, value = 40 } }
+results[1].passes = 2
 result(2, 270230, "Kindlegem Girdle", won("Hazas War", "DRUID", 2, 33, true))
 result(3, 6473, "Armor of the Fang", nil, { allPassed = true })
 WOW.FireEvent("LOOT_HISTORY_UPDATE_DROP", 3001, 1)
@@ -228,6 +231,39 @@ local r = row("Ephemeral Choker")
 r.__scripts.OnEnter(r)
 local tip = table.concat(GameTooltip.lines, "\n")
 check(tip:find("Hall of Thanes", 1, true) and tip:find("Faldrim Anvilmar", 1, true), "the tooltip says where it dropped")
+
+-- opening an item shows the players who rolled
+local linked
+function IsModifiedClick(what) return what == "CHATLINK" and WOW.shift or false end
+function ChatEdit_InsertLink(l) linked = l end
+local function subLines()
+    local t = {}
+    for _, rr in ipairs(w.listRows) do
+        if rr:IsShown() and not rr.entry and rr.sub:GetText() ~= "" then t[#t + 1] = rr end
+    end
+    return t
+end
+check(#subLines() == 0, "no item is opened at first")
+r.__scripts.OnClick(r)
+local subs = subLines()
+check(#subs == 3, "a click opens the item: its 2 rolls and the passes (" .. #subs .. ")")
+check(subs[1].sub:GetText():find("Teki La", 1, true) and subs[1].kind:GetText():find("Need", 1, true) and subs[1].roll:GetText() == "87"
+    and subs[1].who:GetText():find("Winner", 1, true), "a player's line has the name, the kind of roll, the roll and a mark for the winner")
+check(subs[2].roll:GetText() ~= "" and not subs[2].who:GetText():find("Winner", 1, true), "...the others carry no winner mark")
+check(subs[3].sub:GetText():find("2 passed", 1, true), "...and the passes close the list")
+check(w.listRows[1].entry ~= nil, "the opened item stays on its line")
+r.__scripts.OnClick(r)
+WOW.shift = true
+r.__scripts.OnClick(r)
+WOW.shift = false
+check(linked == r.entry.link and #subLines() == 0, "shift-click links the item and does not open it")
+r.__scripts.OnClick(r)
+r.__scripts.OnClick(r)
+check(#subLines() == 0, "a second click closes it")
+local noRolls = row("Armor of the Fang")
+noRolls.__scripts.OnClick(noRolls)
+check(#subLines() == 1 and subLines()[1].sub:GetText():find("No rolls recorded", 1, true), "an item without rolls says so")
+noRolls.__scripts.OnClick(noRolls)
 
 -- scrolling
 for i = 1, 20 do

@@ -28,9 +28,10 @@ local GREY = "|cffb3b3b3"
 local GOLD = "|cffffd100"
 
 local win
-local state = { sel = nil, mine = false, treeOff = 0, listOff = 0, collapsed = {} }
+local state = { sel = nil, mine = false, treeOff = 0, listOff = 0, collapsed = {}, open = {} }
 local flat = {}      -- the tree as shown, one line per row
 local shown = {}     -- the entries of the selection
+local lines = {}     -- the list as shown: an item, then the rolls of the items that are opened
 
 local function Log() return CL.LootLog end
 
@@ -132,6 +133,7 @@ local function Tooltip(owner, e)
     if e.me and e.me.type then
         GameTooltip:AddLine("You: " .. (RollText(e.me) or "-"), 0.25, 1, 0.25)
     end
+    GameTooltip:AddLine("Click: show or hide who rolled", 0.5, 0.5, 0.5)
     GameTooltip:Show()
 end
 
@@ -211,20 +213,65 @@ local function RefreshTree()
     Thumb(win.treeBar, state.treeOff, #flat, TREE_ROWS)
 end
 
+-- The lines of the list: each item, and under an opened one the players who rolled for it.
+local function BuildLines()
+    lines = {}
+    for _, e in ipairs(shown) do
+        lines[#lines + 1] = { e = e }
+        if state.open[e.id] then
+            for _, r in ipairs(e.rolls or {}) do lines[#lines + 1] = { e = e, roll = r } end
+            if e.passes and e.passes > 0 then
+                lines[#lines + 1] = { e = e, note = ("%d passed"):format(e.passes) }
+            end
+            if #(e.rolls or {}) == 0 and not (e.passes and e.passes > 0) then
+                lines[#lines + 1] = { e = e, note = "No rolls recorded" }
+            end
+        end
+    end
+end
+
 local function RefreshList()
     shown = Log().Select(state.sel, state.mine)
-    local maxOff = math.max(0, #shown - LIST_ROWS)
+    BuildLines()
+    local maxOff = math.max(0, #lines - LIST_ROWS)
     if state.listOff > maxOff then state.listOff = maxOff end
     win.heading:SetText(SelText())
     win.count:SetText(("%d drop%s"):format(#shown, #shown == 1 and "" or "s"))
     win.empty:SetShown(#shown == 0)
     for i = 1, LIST_ROWS do
-        local row, e = win.listRows[i], shown[i + state.listOff]
-        row.entry = e
-        if not e then
+        local row, ln = win.listRows[i], lines[i + state.listOff]
+        row.entry = nil
+        row.border:SetShown(ln ~= nil and not ln.roll and not ln.note)
+        row.icon:SetShown(ln ~= nil and not ln.roll and not ln.note)
+        if not ln then
             row:Hide()
-        else
+        elseif ln.roll or ln.note then
+            -- a player who rolled (or a note), under its item
             row:Show()
+            row.tint:SetColorTexture(0, 0, 0, 0.3)
+            row.name:SetText("")
+            row.kind:SetText("")
+            row.roll:SetText("")
+            row.who:SetText("")
+            if ln.roll then
+                local r = ln.roll
+                local kind, value = RollText(r) or "", ""
+                if r.type and CL.ROLL_NAME and CL.ROLL_NAME[r.type] then
+                    kind, value = CL.ROLL_NAME[r.type], r.value and tostring(r.value) or ""
+                end
+                row.sub:SetText(Hex(ClassColor(r.class)) .. ShortName(r.name) .. "|r")
+                row.kind:SetText(GREY .. kind .. "|r")
+                row.roll:SetText(value)
+                row.who:SetText(r.isWinner and (GOLD .. "Winner|r") or "")
+            else
+                row.sub:SetText(GREY .. ln.note .. "|r")
+            end
+        else
+            local e = ln.e
+            row:Show()
+            row.entry = e
+            row.tint:SetColorTexture(1, 1, 1, state.open[e.id] and 0.07 or 0)
+            row.sub:SetText("")
             row.icon:SetTexture(IconOf(e.link))
             local r, g, b = CL.QualityColor(e.quality)
             row.border:SetColorTexture(r or 1, g or 1, b or 1, 1)
@@ -236,7 +283,7 @@ local function RefreshList()
             row.who:SetText(who)
         end
     end
-    Thumb(win.listBar, state.listOff, #shown, LIST_ROWS)
+    Thumb(win.listBar, state.listOff, #lines, LIST_ROWS)
 end
 
 local function Refresh()
@@ -390,6 +437,8 @@ local function Create()
         local row = CreateFrame("Button", nil, right)
         row:SetSize(LIST_W, LIST_H)
         row:SetPoint("TOPLEFT", right, "TOPLEFT", 0, -(i - 1) * LIST_H)
+        row.tint = row:CreateTexture(nil, "BACKGROUND")
+        row.tint:SetAllPoints()
         local hover = row:CreateTexture(nil, "HIGHLIGHT")
         hover:SetAllPoints()
         hover:SetColorTexture(1, 1, 1, 0.06)
@@ -409,6 +458,7 @@ local function Create()
             return c
         end
         row.name = Cell("GameFontHighlight", COL_ITEM, COL_ITEM_W)
+        row.sub = Cell("GameFontHighlightSmall", COL_ITEM + 16, COL_ITEM_W - 16)
         row.kind = Cell("GameFontHighlightSmall", COL_KIND, COL_KIND_W)
         row.roll = Cell("GameFontHighlightSmall", COL_ROLL, COL_ROLL_W, "RIGHT")
         row.who = Cell("GameFontHighlightSmall", COL_WHO, COL_WHO_W)
@@ -416,8 +466,12 @@ local function Create()
         row:SetScript("OnLeave", function() GameTooltip:Hide() end)
         row:SetScript("OnClick", function(self)
             local e = self.entry
-            if e and e.link and IsModifiedClick and IsModifiedClick("CHATLINK") and ChatEdit_InsertLink then
+            if not e then return end
+            if e.link and IsModifiedClick and IsModifiedClick("CHATLINK") and ChatEdit_InsertLink then
                 ChatEdit_InsertLink(e.link)
+            else
+                state.open[e.id] = not state.open[e.id] or nil
+                Refresh()
             end
         end)
         f.listRows[i] = row
@@ -444,6 +498,7 @@ local function Create()
     erase:SetScript("OnClick", function()
         CL.MasterLoot.Confirmation("Erase the whole record of who won what?", "This cannot be undone.", function()
             Log().Clear()
+            state.open = {}
             state.sel = nil
             Refresh()
         end, "Erase")
