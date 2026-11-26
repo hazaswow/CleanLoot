@@ -1,6 +1,6 @@
 -- Minimap button (LibDBIcon + LibDataBroker), the standard way, so minimap
 -- button collectors and the addon compartment pick it up too.
---   Left-click   toggle Blizzard's Loot Rolls history window
+--   Left-click   toggle the loot record (CleanLoot's own window, else Blizzard's Loot Rolls window)
 --   Right-click  options
 --   Shift-click  simulate a few drops
 
@@ -12,9 +12,14 @@ CL.MinimapButton = Button
 
 local BUTTON_NAME = "CleanLoot"
 
--- Forever already has a loot history window (GroupLootHistoryFrame, load-on-demand),
--- with every drop and who rolled what, so CleanLoot does not ship its own.
+-- CleanLoot's loot record window (LootWindow.lua), unless the option gives the game's own
+-- window (GroupLootHistoryFrame, load-on-demand) back.
 function Button.ToggleLootHistory()
+    local W = CL.LootWindow
+    if W and W.Toggle and CL.db and CL.db.historyReplace ~= false then
+        W.Toggle()
+        return
+    end
     if not _G.GroupLootHistoryFrame and C_AddOns and C_AddOns.LoadAddOn then
         C_AddOns.LoadAddOn("Blizzard_GroupLootHistoryFrame")
     end
@@ -49,7 +54,7 @@ function Button.Setup()
         end,
         OnTooltipShow = function(tooltip)
             tooltip:AddLine(("CleanLoot v%s"):format(CL.Version()))
-            tooltip:AddLine("Left-click: loot history", 1, 1, 1)
+            tooltip:AddLine("Left-click: who won what", 1, 1, 1)
             tooltip:AddLine("Right-click: options window", 1, 1, 1)
             tooltip:AddLine("Shift-click: simulate drops", 0.6, 0.6, 0.6)
         end,

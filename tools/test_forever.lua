@@ -407,9 +407,15 @@ check(lines[1] == "CleanLoot v1.0.0-test", "tooltip shows the addon version (got
 
 WOW.shift = false
 obj.OnClick(nil, "LeftButton")
-check(GroupLootHistoryFrame:IsShown(), "left-click opens Blizzard's loot history")
+check(CL.LootWindow.Window():IsShown() and not GroupLootHistoryFrame:IsShown(), "left-click opens CleanLoot's loot record, not Blizzard's")
 obj.OnClick(nil, "LeftButton")
-check(not GroupLootHistoryFrame:IsShown(), "left-click again closes it")
+check(not CL.LootWindow.Window():IsShown(), "left-click again closes it")
+CL.db.historyReplace = false
+obj.OnClick(nil, "LeftButton")
+check(GroupLootHistoryFrame:IsShown() and not CL.LootWindow.Window():IsShown(), "with the option off, left-click opens Blizzard's loot history")
+obj.OnClick(nil, "LeftButton")
+check(not GroupLootHistoryFrame:IsShown(), "...and closes it again")
+CL.db.historyReplace = true
 
 obj.OnClick(nil, "RightButton")
 check(CL.Options.window:IsShown(), "right-click opens the options window")
