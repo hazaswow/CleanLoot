@@ -265,8 +265,16 @@ local function Build(parent)
         CL.Results.ResetPosition()
     end)
 
-    Text(panel, "Minimap", 16, -368, "GameFontNormalLarge")
-    widgets.minimap = Checkbox(panel, "Hide the minimap button", 16, -392,
+    Text(panel, "Roll frame skin", 16, -368, "GameFontNormalLarge")
+    widgets.skinClean = Checkbox(panel, "CleanLoot (flat and dark)", 16, -392,
+        function() return CL.RollFrames.Skin() == "clean" end,
+        function() CL.RollFrames.SetSkin("clean") Options.Refresh() end)
+    widgets.skinBlizzard = Checkbox(panel, "Classic (like the game's own frames)", 16, -416,
+        function() return CL.RollFrames.Skin() == "blizzard" end,
+        function() CL.RollFrames.SetSkin("blizzard") Options.Refresh() end)
+
+    Text(panel, "Minimap", 16, -452, "GameFontNormalLarge")
+    widgets.minimap = Checkbox(panel, "Hide the minimap button", 16, -476,
         function() return CL.db.minimap and CL.db.minimap.hide end,
         function(v) CL.MinimapButton.SetHidden(v) end)
 

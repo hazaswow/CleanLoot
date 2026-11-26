@@ -21,6 +21,7 @@ CL.DEFAULT_SCALE = 1.10
 
 local DEFAULTS = {
     growDirection = "DOWN",
+    rollSkin = "clean",  -- "clean" (CleanLoot's flat frames) or "blizzard" (the game's classic roll frame)
     frameScale = CL.DEFAULT_SCALE,
     locked = true,  -- the stack cannot be dragged by accident (always movable during /cll sim)
     hideNative = true,  -- hide Blizzard's own roll frames, ours replace them

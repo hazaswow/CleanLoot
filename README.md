@@ -10,6 +10,7 @@ Clean loot roll frames for **WoW Forever** (the official Blizzard beta client). 
 ## Features
 
 - **Its own roll frames** in place of Blizzard's: item icon with tooltip (**Ctrl+click** to preview, **Shift+click** to link in chat), name and border coloured by quality, timer bar, and **Need / Greed / Pass** (Forever has no Disenchant or Transmog rolls)
+- **Two skins**: CleanLoot's flat dark frames (default) or the game's classic roll frame look (dialog border, dice / coin / pass buttons): *Options → General → Roll frame skin*, or `/cll skin blizzard|clean`
 - **Live vote counters**: a number on each button for how many players chose it, and on hover the list of players (class coloured, with the roll once the game reveals it) — also on a greyed-out button, which also tells you why it is unavailable
 - **"Hasn't rolled yet"**: a small clock with the number of players still deciding; hover for who
 - **Big drops**: more rolls than frames? The rest wait in a queue and appear as you answer, with their timers still running. No roll is lost
@@ -49,6 +50,7 @@ Clean loot roll frames for **WoW Forever** (the official Blizzard beta client). 
 | `/cll next` / `/cll previous` | Select the next or previous visible roll |
 | `/cll inspect` | Toggle the separate inspection tooltip |
 | `/cll need` / `/cll greed` / `/cll pass` | Roll on the selected item |
+| `/cll skin [clean\|blizzard]` | The look of the roll frames: CleanLoot's own, or the game's classic one |
 | `/cll sim [n]` | Simulate *n* loot rolls (1-8) with a simulated group, to try the frames without a real drop. With a watchlist, the first drop is always one of the watched items |
 | `/cll sim colors` | One simulated drop of every item colour |
 | `/cll master [on\|off]` | Turn CleanLoot's master loot features on or off |

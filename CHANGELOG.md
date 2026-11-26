@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.8.0 (in progress)
+
+**A second skin for the roll frames**
+- *Classic*: the game's own roll frame look, with the dialog border, the dice / coin / pass pictures as buttons, the item in its slot (coloured by quality) and the timer bar below. Everything else works as in the flat skin: vote counters, the "hasn't rolled yet" clock, the watchlist outline and note, auto-roll marks, controller mode. Choose it in *Options → General → Roll frame skin* or with `/cll skin blizzard` (`/cll skin clean` goes back to the flat one). It applies at once, to the rolls already on screen too.
+
 ## 1.7.0
 
 **Loot sessions: hand out what the boss dropped, one item at a time** (master looter)

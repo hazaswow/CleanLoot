@@ -8,7 +8,9 @@ local RF = {}
 CL.RollFrames = RF
 
 local MAX_FRAMES = 8
-local FRAME_W, FRAME_H = 252, 70
+-- Two skins: "clean" (CleanLoot's flat dark frames, the default) and "blizzard" (the game's classic
+-- roll frame: dialog border, dice / coin / pass buttons, slot-framed icon).
+local DIMS = { clean = { w = 252, h = 70 }, blizzard = { w = 262, h = 84 } }
 local NOTE_H = 14   -- a watchlist note adds one line to the frame
 local WATCH_R, WATCH_G, WATCH_B = 0.25, 1, 0.95   -- the watchlist's outline and note: cyan, no quality uses it
 local SPACING = 6
@@ -17,6 +19,24 @@ local BACKDROP = {
     bgFile = FLAT, edgeFile = FLAT, edgeSize = 1,
     insets = { left = 1, right = 1, top = 1, bottom = 1 },
 }
+
+local DIALOG = {
+    bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+    edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+    tile = true, tileSize = 32, edgeSize = 32,
+    insets = { left = 11, right = 11, top = 11, bottom = 11 },
+}
+local BUTTON_ART = {   -- roll type -> the classic button texture (-Up / -Down)
+    [1] = "Interface\\Buttons\\UI-GroupLoot-Dice",
+    [2] = "Interface\\Buttons\\UI-GroupLoot-Coin",
+    [0] = "Interface\\Buttons\\UI-GroupLoot-Pass",
+}
+
+local function Skin()
+    return (CL.db and CL.db.rollSkin == "blizzard") and "blizzard" or "clean"
+end
+
+local function Dims() return DIMS[Skin()] end
 
 local pool = {}      -- every frame ever created
 local active = {}    -- frames in use, oldest first (drives the stack order)
@@ -36,6 +56,31 @@ end
 local function Preview(link)
     local fn = DressUpLink or DressUpItemLink
     if fn then fn(link) end
+end
+
+-- A button's look: the classic art follows its state (greyed when unavailable, green when an
+-- auto-roll rule answers with it); the flat skin draws its own state in the label.
+local function PaintButton(b)
+    if Skin() ~= "blizzard" then
+        b:SetAlpha(1)
+        return
+    end
+    b.art:SetDesaturated(b.unavailable and true or false)
+    if b.auto and not b.unavailable then b.art:SetVertexColor(0.5, 1, 0.5) else b.art:SetVertexColor(1, 1, 1) end
+    b:SetAlpha(b.unavailable and 0.55 or 1)
+end
+
+-- The quality colour: the flat skin's border, the classic skin's slot around the icon. The name
+-- takes it in both.
+local function PaintQuality(f)
+    local r, g, b = CL.QualityColor(f.quality)
+    f.name:SetTextColor(r, g, b)
+    if Skin() == "blizzard" then
+        f:SetBackdropBorderColor(1, 1, 1, 1)
+        f.slot:SetVertexColor(r, g, b)
+    else
+        f:SetBackdropBorderColor(r, g, b, 1)
+    end
 end
 
 local function GetAnchor()
@@ -155,6 +200,17 @@ local function CreateRollButton(f, rollType)
     label:SetText(CL.ROLL_NAME[rollType])
     b.label = label
 
+    -- the classic skin: the game's own dice / coin / pass pictures instead of a flat button
+    b.art = b:CreateTexture(nil, "ARTWORK")
+    b.art:SetAllPoints()
+    b.art:SetTexture((BUTTON_ART[rollType] or BUTTON_ART[0]) .. "-Up")
+    b.art:Hide()
+    b.glow = b:CreateTexture(nil, "HIGHLIGHT")
+    b.glow:SetAllPoints()
+    b.glow:SetTexture("Interface\\Buttons\\ButtonHilight-Square")
+    b.glow:SetBlendMode("ADD")
+    b.glow:Hide()
+
     local binding = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     binding:SetPoint("BOTTOM", b, "BOTTOM", -6, 1)
     binding:SetJustifyH("CENTER")
@@ -175,6 +231,10 @@ local function CreateRollButton(f, rollType)
     b:SetScript("OnMouseDown", function(self)
         self.clickRollID, self.clickBop = f.rollID, f.bop
         self.clickLink, self.clickName = f.link, f.itemName
+        self.art:SetTexture((BUTTON_ART[self.rollType] or BUTTON_ART[0]) .. "-Down")
+    end)
+    b:SetScript("OnMouseUp", function(self)
+        self.art:SetTexture((BUTTON_ART[self.rollType] or BUTTON_ART[0]) .. "-Up")
     end)
     b:SetScript("OnClick", function(self, button)
         local id, bop, link, name = self.clickRollID, self.clickBop, self.clickLink, self.clickName
@@ -190,11 +250,11 @@ local function CreateRollButton(f, rollType)
         RF.Answer(id, self.rollType, bop)
     end)
     b:SetScript("OnEnter", function(self)
-        if not self.unavailable then self:SetBackdropBorderColor(0.6, 0.6, 0.6, 1) end
+        if not self.unavailable and Skin() == "clean" then self:SetBackdropBorderColor(0.6, 0.6, 0.6, 1) end
         ShowButtonTooltip(self, f)
     end)
     b:SetScript("OnLeave", function(self)
-        self:SetBackdropBorderColor(0.25, 0.25, 0.25, 1)
+        if Skin() == "clean" then self:SetBackdropBorderColor(0.25, 0.25, 0.25, 1) end
         GameTooltip:Hide()
     end)
     return b
@@ -202,7 +262,7 @@ end
 
 local function CreateRollFrame(index)
     local f = CreateFrame("Frame", "CleanLootRollFrame" .. index, UIParent, "BackdropTemplate")
-    f:SetSize(FRAME_W, FRAME_H)
+    f:SetSize(DIMS.clean.w, DIMS.clean.h)
     f:SetFrameStrata("DIALOG")
     f:SetBackdrop(BACKDROP)
     f:SetBackdropColor(0.04, 0.04, 0.04, 0.9)
@@ -251,6 +311,11 @@ local function CreateRollFrame(index)
     icon.tex = icon:CreateTexture(nil, "ARTWORK")
     icon.tex:SetAllPoints()
     icon.tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    icon.slot = icon:CreateTexture(nil, "OVERLAY")   -- the classic skin's slot around the icon
+    icon.slot:SetTexture("Interface\\Buttons\\UI-Quickslot2")
+    icon.slot:SetPoint("CENTER", icon, "CENTER", 0, -1)
+    icon.slot:Hide()
+    f.slot = icon.slot
     icon.count = icon:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
     icon.count:SetPoint("BOTTOMRIGHT", -2, 2)
     icon:SetScript("OnEnter", function(self)
@@ -322,7 +387,7 @@ local function CreateRollFrame(index)
     bar:SetSize(190, 8)
     bar:SetPoint("TOPLEFT", icon, "TOPRIGHT", 6, -24)
     barBG:SetAllPoints(bar)
-    f.bar = bar
+    f.bar, f.barBG = bar, barBG
 
     f.buttons = {}
     local prev
@@ -336,6 +401,8 @@ local function CreateRollFrame(index)
         f.buttons[rollType] = b
         prev = b
     end
+
+    RF.ApplySkin(f)
 
     f:SetScript("OnUpdate", function(self, elapsed)
         if not self.endTime then return end
@@ -376,6 +443,90 @@ local function SetButtonAvailable(btn, available)
         btn.label:SetTextColor(0.4, 0.4, 0.4)
         btn:SetBackdropColor(0.04, 0.04, 0.04, 0.9)
     end
+    PaintButton(btn)
+end
+
+-- Dresses a frame in the current skin: backdrop, sizes and places of everything on it.
+function RF.ApplySkin(f)
+    local skin = Skin()
+    local d = DIMS[skin]
+    local classic = skin == "blizzard"
+    f.skin = skin
+    f:SetSize(d.w, d.h)
+    if classic then
+        f:SetBackdrop(DIALOG)
+        f:SetBackdropColor(1, 1, 1, 1)
+    else
+        f:SetBackdrop(BACKDROP)
+        f:SetBackdropColor(0.04, 0.04, 0.04, 0.9)
+        f:SetBackdropBorderColor(0, 0, 0, 1)
+    end
+
+    local inset = classic and 4 or 1
+    f.watch:ClearAllPoints()
+    f.watch:SetPoint("TOPLEFT", f, "TOPLEFT", inset, -inset)
+    f.watch:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -inset, inset)
+
+    f.icon:SetSize(classic and 40 or 36, classic and 40 or 36)
+    f.icon:ClearAllPoints()
+    f.icon:SetPoint("TOPLEFT", f, "TOPLEFT", classic and 16 or 8, classic and -14 or -8)
+    f.slot:SetSize(classic and 73 or 66, classic and 73 or 66)
+    f.slot:SetShown(classic)
+
+    f.name:ClearAllPoints()
+    if classic then
+        f.name:SetPoint("TOPLEFT", f, "TOPLEFT", 62, -16)
+    else
+        f.name:SetPoint("TOPLEFT", f.icon, "TOPRIGHT", 6, -2)
+    end
+    f.name:SetSize(classic and 159 or 156, 14)
+
+    f.note:ClearAllPoints()
+    f.note:SetPoint("TOPLEFT", f, "TOPLEFT", classic and 17 or 50, classic and -76 or -43)
+    f.note:SetSize(classic and 228 or 190, 11)
+
+    f.pendingFrame:ClearAllPoints()
+    f.pendingFrame:SetPoint("TOPRIGHT", f, "TOPRIGHT", classic and -17 or -8, classic and -15 or -8)
+
+    f.bar:SetStatusBarTexture(classic and "Interface\\TargetingFrame\\UI-StatusBar" or FLAT)
+    f.bar:ClearAllPoints()
+    if classic then
+        f.bar:SetSize(228, 9)
+        f.bar:SetPoint("TOPLEFT", f, "TOPLEFT", 17, -64)
+        f.barBG:SetColorTexture(0, 0, 0, 0.55)
+    else
+        f.bar:SetSize(190, 8)
+        f.bar:SetPoint("TOPLEFT", f.icon, "TOPRIGHT", 6, -24)
+        f.barBG:SetColorTexture(0.12, 0.12, 0.12, 1)
+    end
+
+    local prev
+    for _, rollType in ipairs(CL.ROLL_ORDER) do
+        local b = f.buttons[rollType]
+        b:ClearAllPoints()
+        if classic then
+            b:SetSize(28, 28)
+            if prev then b:SetPoint("LEFT", prev, "RIGHT", 6, 0) else b:SetPoint("TOPLEFT", f, "TOPLEFT", 62, -32) end
+            b:SetBackdrop(nil)
+        else
+            b:SetSize(72, 20)
+            if prev then b:SetPoint("LEFT", prev, "RIGHT", 6, 0) else b:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 8, 8) end
+            b:SetBackdrop(BACKDROP)
+            b:SetBackdropColor(0.08, 0.08, 0.08, 0.9)
+            b:SetBackdropBorderColor(0.25, 0.25, 0.25, 1)
+        end
+        b.art:SetShown(classic)
+        b.glow:SetShown(classic)
+        b.label:SetShown(not classic)
+        b.count:ClearAllPoints()
+        if classic then b.count:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", -1, 2) else b.count:SetPoint("RIGHT", b, "RIGHT", -4, 0) end
+        b.binding:ClearAllPoints()
+        b.binding:SetPoint("BOTTOM", b, "BOTTOM", classic and 0 or -6, classic and 2 or 1)
+        prev = b
+        if f.rollID then SetButtonAvailable(b, not b.unavailable) end
+        PaintButton(b)
+    end
+    if f.rollID then PaintQuality(f) end
 end
 
 -------------------------------------------------
@@ -407,11 +558,12 @@ function RF.Layout()
     if #queue > 0 and prev then
         if not queueLabel then
             queueLabel = CreateFrame("Frame", nil, UIParent)
-            queueLabel:SetSize(FRAME_W, 16)
+            queueLabel:SetSize(Dims().w, 16)
             queueLabel:SetFrameStrata("DIALOG")
             queueLabel.text = queueLabel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
             queueLabel.text:SetPoint("LEFT", queueLabel, "LEFT", 4, 0)
         end
+        queueLabel:SetWidth(Dims().w)
         queueLabel.text:SetText(("+%d more waiting for a free slot"):format(#queue))
         queueLabel:SetScale(scale)
         queueLabel:ClearAllPoints()
@@ -440,6 +592,7 @@ local function ApplyAuto(f)
         else
             b.label:SetTextColor(1, 0.82, 0)
         end
+        PaintButton(b)
     end
 end
 
@@ -458,11 +611,11 @@ local function ApplyWatch(f)
     if watched and note ~= "" then
         f.note:SetText(note)
         f.note:Show()
-        f:SetHeight(FRAME_H + NOTE_H)
+        f:SetHeight(Dims().h + NOTE_H)
     else
         f.note:SetText("")
         f.note:Hide()
-        f:SetHeight(FRAME_H)
+        f:SetHeight(Dims().h)
     end
 end
 
@@ -471,6 +624,23 @@ function RF.RefreshWatch()
     for _, f in ipairs(active) do ApplyWatch(f) end
     RF.Layout()
 end
+
+-- The skin changed (options, /cll skin): every frame, shown or not, is dressed again.
+function RF.RefreshSkin()
+    for _, f in ipairs(pool) do
+        RF.ApplySkin(f)
+        if f.rollID then ApplyWatch(f) ApplyAuto(f) end
+    end
+    RF.Layout()
+end
+
+function RF.SetSkin(skin)
+    if skin ~= "blizzard" then skin = "clean" end
+    CL.db.rollSkin = skin
+    RF.RefreshSkin()
+end
+
+function RF.Skin() return Skin() end
 
 -------------------------------------------------
 -- Public API
@@ -498,9 +668,7 @@ local function Open(f, rollID, info, link, endTime, duration)
     f.icon.tex:SetTexture(info.texture)
     f.icon.count:SetText((info.count or 1) > 1 and info.count or "")
     f.name:SetText(info.name or "?")
-    local r, g, b = CL.QualityColor(info.quality)
-    f.name:SetTextColor(r, g, b)
-    f:SetBackdropBorderColor(r, g, b, 1)
+    PaintQuality(f)
 
     SetButtonAvailable(f.buttons[CL.ROLL.NEED], info.canNeed)
     SetButtonAvailable(f.buttons[CL.ROLL.GREED], info.canGreed)

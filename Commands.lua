@@ -9,6 +9,7 @@ local HELP = {
     "/cll watch         open the watchlist page of the options window",
     "/cll watch [item] [note]  highlight an item when it drops, with an optional note",
     "/cll watch note [item] <text> | remove [item] | list",
+    "/cll skin [clean|blizzard]  the look of the roll frames: CleanLoot's own, or the game's classic one",
     "/cll sim [n]       simulate n loot rolls (1-8) with a fake group",
     "/cll sim colors    one simulated drop of every colour",
     "/cll sim master    a simulated master-loot roll result window",
@@ -77,6 +78,9 @@ SlashCmdList["CLEANLOOT"] = function(msg)
         CL.LootLearn.Command((msg or ""):match("^%s*%S+%s*(.-)%s*$"))
     elseif cmd == "trade" then
         CL.TradeFill.Command()
+    elseif cmd == "skin" then
+        if rest == "clean" or rest == "blizzard" then CL.RollFrames.SetSkin(rest) end
+        CL.Print(("roll frame skin: %s (/cll skin clean|blizzard)."):format(CL.RollFrames.Skin()))
     elseif cmd == "de" then
         CL.Disenchant.Command((msg or ""):match("^%s*%S+%s*(.-)%s*$"))
     elseif cmd == "gargul" then
