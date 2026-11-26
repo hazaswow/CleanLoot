@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.8.1 (in progress)
+
+**A simpler /cll**
+- Only the commands you need remain: `/cll` (the options), `/loot`, `/cll session`, `/cll sim [n]`, the controller mode commands and `/cll debug`. The others did what a tab of the options window already does (`auto`, `watch`, `de`, `master`, `gargul`, `controller`, `take`, `restore`, `history`, `learned`, `trade`, `sim colors|master|group|clear`, `session start|test|stop`, `skin`), and are gone.
+
 ## 1.8.0
 
 **A second skin for the roll frames**

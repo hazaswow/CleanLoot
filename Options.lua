@@ -453,9 +453,6 @@ local function BuildAutoRoll(parent)
     end
     Text(panel, "Bind-on-pickup items only roll for you when", 16, -330, "GameFontDisableSmall")
     Text(panel, "\"Auto-accept bind-on-pickup prompts\" is ticked.", 16, -346, "GameFontDisableSmall")
-    Text(panel, "The same rules work as commands:", 16, -388, "GameFontDisableSmall")
-    Text(panel, "/cll auto need|greed|pass [item]", 16, -406, "GameFontDisableSmall")
-    Text(panel, "/cll auto remove [item]   /cll auto list", 16, -424, "GameFontDisableSmall")
 
     -- item rules, second column
     Text(panel, "Item rules", 330, -56, "GameFontNormalLarge")
@@ -576,10 +573,6 @@ local function BuildWatchlist(parent)
         box:ClearFocus()
         noteBox:ClearFocus()
     end)
-    Text(panel, "The same from the chat:", 16, -300, "GameFontDisableSmall")
-    Text(panel, "/cll watch [item] [note]", 16, -318, "GameFontDisableSmall")
-    Text(panel, "/cll watch note [item] <text>", 16, -336, "GameFontDisableSmall")
-    Text(panel, "/cll watch remove [item]   /cll watch list", 16, -354, "GameFontDisableSmall")
     Text(panel, "/cll sim always drops one watched item, to try it.", 16, -388, "GameFontDisableSmall")
 
     Text(panel, "Watched items", 330, -56, "GameFontNormalLarge")
@@ -759,7 +752,6 @@ local function BuildDisenchant(parent)
         function(v) CL.db.deKeep = v end))
     Text(panel, "Off: he trades the materials back to you, to keep or share out.", 16, -328, "GameFontDisableSmall")
     Text(panel, "Armor and weapons from green to epic only. In a session, a button sends an item to him.", 16, -346, "GameFontDisableSmall")
-    Text(panel, "/cll de ask   /cll de <name>   /cll de clear", 16, -380, "GameFontDisableSmall")
 
     panel:SetScript("OnShow", Options.Refresh)
     return panel
@@ -789,7 +781,7 @@ local function BuildHistory(parent)
             CL.LootLog.Clear()
         end, "Erase")
     end)
-    Text(panel, "/loot   /cll history", 16, -316, "GameFontDisableSmall")
+    Text(panel, "Also: /loot", 16, -316, "GameFontDisableSmall")
 
     panel:SetScript("OnShow", Options.Refresh)
     return panel
@@ -985,7 +977,3 @@ function Options.Toggle()
     end
 end
 
-function Options.OpenController() Options.Open("controller") end
-function Options.OpenAutoRoll() Options.Open("auto") end
-function Options.OpenWatchlist() Options.Open("watch") end
-function Options.OpenMaster() Options.Open("master") end

@@ -109,7 +109,7 @@ function Watchlist.Random()
 end
 
 -------------------------------------------------
--- Slash command: /cll watch [item [note]] | note <item> <text> | remove <item> | list
+-- Reading an item and its note from a line the player typed or pasted
 -------------------------------------------------
 -- Splits "<item> <note>": the item is a link (it contains spaces), "item:123" or a number,
 -- the rest of the line is the note.
@@ -122,47 +122,4 @@ function Watchlist.SplitItem(text)
     end
     local word, rest = text:match("^%s*(%S+)%s*(.-)%s*$")
     return word, rest
-end
-
-function Watchlist.Command(arg)
-    local sub, rest = (arg or ""):match("^%s*(%S*)%s*(.-)%s*$")
-    local key = sub:lower()
-    if key == "" then
-        CL.Options.OpenWatchlist()
-    elseif key == "list" then
-        local list = Watchlist.List()
-        if #list == 0 then CL.Print("the watchlist is empty. /cll watch [item] [note]") end
-        for _, e in ipairs(list) do
-            print(("  %s%s (item %d)"):format(e.name, e.note ~= "" and (" - " .. e.note) or "", e.id))
-        end
-    elseif key == "remove" then
-        local word = Watchlist.SplitItem(rest)
-        local id = Watchlist.ItemID(word)
-        if id and Watchlist.Remove(id) then
-            CL.Print(("%s is no longer on the watchlist."):format(CL.AutoRoll.NameOf(id, word)))
-        else
-            CL.Print("that item is not on the watchlist.")
-        end
-    elseif key == "note" then
-        local word, note = Watchlist.SplitItem(rest)
-        local id = Watchlist.ItemID(word)
-        if id and Watchlist.SetNote(id, note) then
-            CL.Print(note ~= "" and ("note saved for %s."):format(CL.AutoRoll.NameOf(id, word))
-                or ("note cleared for %s."):format(CL.AutoRoll.NameOf(id, word)))
-        else
-            CL.Print("that item is not on the watchlist. Add it first: /cll watch [item] [note]")
-        end
-    else
-        -- anything else is an item, optionally followed by its note
-        local word, note = Watchlist.SplitItem(arg)
-        local id = Watchlist.ItemID(word)
-        if not id then
-            CL.Print("/cll watch  |  /cll watch [item] [note]  |  /cll watch note [item] <text>  |  /cll watch remove [item]  |  /cll watch list")
-            return
-        end
-        Watchlist.Add(id, CL.AutoRoll.NameOf(id, word), note)
-        CL.Print(("%s is on the watchlist%s%s."):format(CL.AutoRoll.NameOf(id, word),
-            CleanNote(note) ~= "" and (": " .. CleanNote(note)) or "",
-            CL.db.watchEnabled and "" or " (the highlight is switched off in the options)"))
-    end
 end

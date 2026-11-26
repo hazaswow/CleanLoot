@@ -154,8 +154,6 @@ give("Teki La", 100)
 CL.db.tradeFill = false
 openTrade("Teki La")
 check(slotsUsed() == 0, "with the option off nothing is placed")
-TF.Command()
-check(slotsUsed() == 1, "...but /cll trade does it on request")
 
 -- not the master loot switch on
 reset()
@@ -265,19 +263,6 @@ WOW.FireEvent("TRADE_CLOSED")
 WOW.Advance(1)
 check(part >= 1 and part < 5 and slotsUsed() == part, "a window closed in the middle stops the filling")
 check(cursor == nil, "...without an item stuck on the cursor")
-
--- the command
-reset()
-TF.Command()
-check(sayMatches("open a trade window first"), "/cll trade without a window says so")
-reset()
-give("Yan Yarrow", 100)
-npc = "Teki La"
-WOW.FireEvent("TRADE_SHOW")
-WOW.Advance(1)
-said = {}
-TF.Command()
-check(sayMatches("nothing to hand over to Teki La"), "/cll trade with nothing owed says so")
 
 -- an item the player won back is not given twice
 reset()

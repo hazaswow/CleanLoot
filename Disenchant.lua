@@ -307,21 +307,3 @@ end
 function DE.Toggle()
     if DE.window and DE.window:IsShown() then DE.window:Hide() else DE.Open() end
 end
-
--- /cll de [ask | stop | clear | <name>]
-function DE.Command(arg)
-    arg = (arg or ""):gsub("^%s+", ""):gsub("%s+$", "")
-    local key = arg:lower()
-    if key == "" then
-        DE.Toggle()
-    elseif key == "ask" then
-        DE.Open()
-        DE.Ask()
-    elseif key == "stop" then
-        if not DE.StopAsking() then CL.Print("not asking.") end
-    elseif key == "clear" or key == "none" then
-        if DE.Clear() then CL.Print("no disenchanter designated any more.") else CL.Print("nobody was designated.") end
-    else
-        DE.Designate(arg)
-    end
-end

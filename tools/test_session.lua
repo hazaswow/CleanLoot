@@ -409,17 +409,15 @@ box.give.__scripts.OnClick(box.give)
 check(sentHas("assigned to Iso Tope for roll OS 90"), "confirming assigns it")
 Run.Cancel()
 
--- 14. The commands
+-- 14. Starting and stopping
 reset()
-SlashCmdList.CLEANLOOT("session start")
-check(Run.Active(), "/cll session start starts a session")
-SlashCmdList.CLEANLOOT("session stop")
-check(not Run.Active(), "/cll session stop ends it")
+Run.Start()
+check(Run.Active(), "a session starts")
+check(Run.Cancel() and not Run.Active(), "...and is cancelled")
 said = {}
-SlashCmdList.CLEANLOOT("session stop")
-check(sayMatches("no session is running"), "(and says so when none runs)")
-SlashCmdList.CLEANLOOT("session test")
-check(Run.Active() and Run.State().test, "/cll session test starts a test")
+check(not Run.Cancel(), "(cancelling when none runs does nothing)")
+Run.StartTest()
+check(Run.Active() and Run.State().test, "a test session starts")
 Run.Cancel()
 
 

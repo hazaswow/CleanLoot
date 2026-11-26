@@ -40,9 +40,9 @@ check(W.keyboard:GetParent() == CL.Options.controllerPanel and W.inspect:GetPare
 check(W.minimap:GetParent() == CL.Options.panel and W.sim:GetParent() == CL.Options.panel
     and W.waiting:GetParent() == CL.Options.panel, "...and the rest stays on the main page")
 CL.Options.window:Hide()
-SlashCmdList.CLEANLOOT("controller")
+CL.Options.Open("controller")
 check(CL.Options.window:IsShown() and CL.Options.CurrentPage() == "controller"
-    and CL.Options.controllerPanel:IsShown(), "/cll controller opens the window on that page")
+    and CL.Options.controllerPanel:IsShown(), "the window opens on the controller page")
 SlashCmdList.CLEANLOOT("")
 check(not CL.Options.window:IsShown(), "/cll closes it")
 CL.Options.Open("general")

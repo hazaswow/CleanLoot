@@ -109,20 +109,8 @@ kill(3030, "Off")
 check(Learn.Get(3030) == nil, "with the option off nothing is written down")
 CL.db.learnLoot = true
 
-said = {}
-Learn.Command("")
-check(sayMatches("boss") and sayMatches("Hall of Thanes - Faldrim Anvilmar: 2 kills, 2 items"), "/cll learned lists the bosses")
-said = {}
-Learn.Command("faldrim")
-check(sayMatches("Hall of Thanes - Faldrim Anvilmar: 2 kills") and sayMatches("Ephemeral Choker") and sayMatches("2/2"), "/cll learned <boss> lists its items with drops/kills")
-said = {}
-Learn.Command("nobody")
-check(sayMatches("no boss matches"), "an unknown boss is said")
-Learn.Command("clear")
-check(#Learn.List() == 0, "/cll learned clear forgets it all")
-said = {}
-Learn.Command("")
-check(sayMatches("nothing learned yet"), "...and says nothing is learned")
+check(#Learn.Find("faldrim") == 1 and Learn.Find("faldrim")[1].kills == 2, "a boss is found by part of its name")
+check(#Learn.Find("nobody") == 0, "an unknown boss is not found")
 
 io.write(("%d checks, %d failures\n"):format(checks, failures))
 os.exit(failures == 0 and 0 or 1)

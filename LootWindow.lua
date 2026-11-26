@@ -1,4 +1,4 @@
--- The loot record window (/loot, /cll history): who won what, picked by instance or by boss.
+-- The loot record window (/loot, and the minimap button): who won what, picked by instance or by boss.
 -- It takes the place of the game's own "Loot Rolls" window, which keeps failing, and keeps
 -- its way of working: a list of the drops with the item and the winner, the rolls in the
 -- tooltip, a click on an item to link it in the chat. The data is LootLog.lua's.
@@ -629,7 +629,3 @@ boot:SetScript("OnEvent", function(self, event)
         self:UnregisterEvent("LOOT_HISTORY_UPDATE_DROP")
     end
 end)
-
-function W.Command()
-    W.Toggle()
-end

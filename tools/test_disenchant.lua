@@ -161,9 +161,9 @@ reset()
 DE.Ask()
 DE.Hear("de 300", "Teki La")
 DE.Hear("de", "Iso Tope")
-SlashCmdList.CLEANLOOT("de")
+DE.Open()
 local win = DE.window
-check(win and win:IsShown(), "/cll de opens the window")
+check(win and win:IsShown(), "the window opens")
 check(win.current:GetText():find("nobody yet", 1, true) and win.sub:GetText():find("Listening", 1, true), "it says nobody is designated, and that it listens")
 local rows = {}
 for _, row in ipairs(win.rows) do if row:IsShown() then rows[#rows + 1] = row end end
@@ -184,19 +184,20 @@ win.ask.__scripts.OnClick(win.ask)
 check(DE.IsAsking() and #DE.candidates == 0, "the button asks again, with a fresh list")
 win.stop.__scripts.OnClick(win.stop)
 check(not DE.IsAsking(), "Stop closes the question")
-SlashCmdList.CLEANLOOT("de")
-check(not win:IsShown(), "/cll de again closes the window")
+DE.Toggle()
+check(not win:IsShown(), "toggling closes the window")
 
--- 6. The commands
+-- 6. Asking, designating, clearing
 reset()
-SlashCmdList.CLEANLOOT("de ask")
-check(DE.IsAsking() and DE.window:IsShown(), "/cll de ask opens the window and asks")
-SlashCmdList.CLEANLOOT("de stop")
-check(not DE.IsAsking(), "/cll de stop")
-SlashCmdList.CLEANLOOT("de Teki La")
-check(DE.Name() == "Teki La", "/cll de <name> designates")
-SlashCmdList.CLEANLOOT("de clear")
-check(DE.Name() == nil, "/cll de clear")
+DE.Ask()
+check(DE.IsAsking(), "asking")
+DE.StopAsking()
+check(not DE.IsAsking(), "stopping")
+DE.Designate("Teki La")
+check(DE.Name() == "Teki La", "designating by name")
+DE.Clear()
+check(DE.Name() == nil, "clearing")
+
 
 -- 7. A session gives the disenchanter what nobody wants
 local function session(items)

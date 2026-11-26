@@ -165,26 +165,11 @@ greed.__scripts.OnClick(greed, "LeftButton")
 check(#rolled == 1 and AR.ItemRule(12345) == nil and RF.GetFrame(1017) == nil, "a left click answers and remembers nothing")
 reset()
 
--- 12. Commands
-SlashCmdList.CLEANLOOT("auto need |cffa335ee|Hitem:999::::::::|h[Some Idol]|h|r")
-check(AR.ItemRule(999) and AR.ItemRule(999).roll == N and AR.ItemRule(999).name == "Some Idol",
-    "/cll auto need [link] adds a rule, name from the link, case kept")
-SlashCmdList.CLEANLOOT("auto greed 1000")
-check(AR.ItemRule(1000) and AR.ItemRule(1000).roll == G, "/cll auto greed <id> works with a bare id")
-SlashCmdList.CLEANLOOT("auto pass item:1001")
-check(AR.ItemRule(1001) and AR.ItemRule(1001).roll == P, "/cll auto pass item:<id> works too")
-said = {}
-SlashCmdList.CLEANLOOT("auto list")
-check(sayMatches("Some Idol") and sayMatches("always Greed"), "/cll auto list shows the rules")
-SlashCmdList.CLEANLOOT("auto remove |Hitem:999|h[Some Idol]|h")
-check(AR.ItemRule(999) == nil, "/cll auto remove [link] forgets the rule")
-said = {}
-SlashCmdList.CLEANLOOT("auto need")
-check(AR.ItemRule(0) == nil and sayMatches("give an item"), "/cll auto need without an item says what is missing")
-CL.Options.window:Hide()
-check(pcall(SlashCmdList.CLEANLOOT, "auto") and CL.Options.window:IsShown() and CL.Options.CurrentPage() == "auto",
-    "/cll auto opens the auto-roll page")
-CL.Options.window:Hide()
+-- 12. Reading an item from a pasted line
+check(AR.ItemID("|cffa335ee|Hitem:999::::::::|h[Some Idol]|h|r") == 999, "a link gives its item id")
+check(AR.ItemID("1000") == 1000 and AR.ItemID("item:1001") == 1001, "a bare id and item:<id> work too")
+check(AR.ItemID("not an item") == nil, "anything else is refused")
+check(AR.NameOf(999, "|cffa335ee|Hitem:999::::::::|h[Some Idol]|h|r") == "Some Idol", "the name comes from the link, case kept")
 reset()
 
 -- 13. The options page

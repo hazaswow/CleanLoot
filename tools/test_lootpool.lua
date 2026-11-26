@@ -402,8 +402,8 @@ check(Session.Window():IsShown(), "the tab's button opens the session window")
 Session.Window():Hide()
 slotsData = {}
 said = {}
-SlashCmdList.CLEANLOOT("take")
-check(sayMatches("nothing to take"), "/cll take with nothing in the window says so")
+CL.TakeAll.Run(false)
+check(sayMatches("nothing to take"), "taking with nothing in the window says so")
 
 print = realPrint
 io.write(("%d checks, %d failed\n"):format(checks, failures))

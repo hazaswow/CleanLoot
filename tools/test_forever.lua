@@ -742,18 +742,18 @@ for i = 1, 3 do
         "/cll sim: frame " .. i .. " shows the clock with the 4 players still deciding")
     check((fr.pendingFrame:GetPoint()) == "TOPRIGHT", "...in the top-right corner")
 end
-SlashCmdList["CLEANLOOT"]("sim clear")
-check(RF.ActiveCount() == 0, "/cll sim clear removes them")
+CL.Sim.Clear()
+check(RF.ActiveCount() == 0, "clearing the simulation removes them")
 
-SlashCmdList["CLEANLOOT"]("sim group 10")
-SlashCmdList["CLEANLOOT"]("sim colors")
-check(RF.ActiveCount() == 5, "/cll sim colors opens five frames")
+CL.Sim.SetGroupSize(10)
+CL.Sim.Colors()
+check(RF.ActiveCount() == 5, "the colours test opens five frames")
 for i = 1, 5 do
     local fr = _G["CleanLootRollFrame" .. i]
     check(fr.pendingFrame:IsShown() and tostring(fr.pendingCount:GetText()) == "10",
-        "/cll sim colors: frame " .. i .. " shows the clock with 10 players deciding")
+        "colours test: frame " .. i .. " shows the clock with 10 players deciding")
 end
-SlashCmdList["CLEANLOOT"]("sim clear")
+CL.Sim.Clear()
 CL.Sim.SetGroupSize(4)
 
 -- 27. Position lock: locked by default, movable only when unlocked or while simulating
@@ -921,13 +921,16 @@ check(CL.Options.window:IsShown(), "/cll opens the options window")
 SlashCmdList["CLEANLOOT"]("")
 check(not CL.Options.window:IsShown(), "/cll again closes it")
 SlashCmdList["CLEANLOOT"]("options")
-check(CL.Options.window:IsShown(), "/cll options opens it too")
+check(not CL.Options.window:IsShown(), "/cll options is not a command (it shows the help)")
 CL.Options.window:Hide()
 WOW.chat = {}
 SlashCmdList["CLEANLOOT"]("help")
 local help = table.concat(WOW.chat, "\n")
 check(help:find("sim", 1, true) and help:find("debug", 1, true) and help:find("session", 1, true),
     "/cll help lists the sim, debug and session commands")
+for _, gone in ipairs({ "restore", "take", "trade", "learned", "gargul", "watch", "auto" }) do
+    check(not help:find("/cll " .. gone, 1, true), "...and not /cll " .. gone)
+end
 check(not help:find("grow", 1, true) and not help:find("toasts", 1, true) and not help:find("native", 1, true),
     "...and none of the settings that live in the options")
 local before = CL.db.growDirection

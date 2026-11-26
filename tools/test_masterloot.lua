@@ -282,8 +282,8 @@ ML.Confirm().give.__scripts.OnClick(ML.Confirm().give)
 check(sim.given and #sent == 0 and #gave == 0, "a simulated hand-out calls nothing and says nothing to the group")
 check(sayMatches("given to"), "...it is only printed")
 said = {}
-SlashCmdList.CLEANLOOT("sim master")
-check(#ML.Windows() == 2, "the slash command works too")
+ML.Simulate()
+check(#ML.Windows() == 2, "a second simulated window opens too")
 
 -- 11. The options
 check(CL.Options.widgets.masterWindow and CL.Options.widgets.masterAnnounce, "the General page has the two master-loot options")
@@ -336,14 +336,12 @@ check(#ML.Windows() == 0 and not ML.Enabled() and CL.db.masterEnabled == false, 
 Standard(7401)
 over(7401)
 check(#ML.Windows() == 0, "off: no window when the rolls end")
-check(ML.Simulate() == nil and sayMatches("master loot features are off"), "off: /cll sim master says so")
+check(ML.Simulate() == nil and sayMatches("master loot features are off"), "off: the simulated window says so")
 said = {}
-SlashCmdList.CLEANLOOT("master on")
-check(ML.Enabled() and sayMatches("master loot features: on"), "/cll master on turns it back on")
-SlashCmdList.CLEANLOOT("master off")
-check(not ML.Enabled() and sayMatches("master loot features: off"), "/cll master off turns it off")
-SlashCmdList.CLEANLOOT("master")
-check(not ML.Enabled(), "/cll master alone only says where it stands")
+ML.SetEnabled(true)
+check(ML.Enabled(), "turning it back on works")
+ML.SetEnabled(false)
+check(not ML.Enabled(), "...and off again")
 -- a late history update does not reopen anything while it is off
 Drop(7402, { Entry("Teki La", "PRIEST", 4) })
 WOW.FireEvent("LOOT_HISTORY_UPDATE_DROP", 0, 7402)
@@ -381,8 +379,8 @@ end
 
 resetGargul()
 check(ML.GargulAnnounces() == nil and not ML.AskGargul(false), "no Gargul: nothing to ask")
-SlashCmdList.CLEANLOOT("gargul")
-check(sayMatches("Gargul is not installed"), "/cll gargul says so when it is not there")
+ML.AskGargul(true)
+check(sayMatches("Gargul is not installed"), "asking about Gargul says so when it is not there")
 
 resetGargul()
 Gargul = fakeGargul(true)
@@ -393,8 +391,8 @@ gb.both.__scripts.OnClick(gb.both)
 check(not gb:IsShown() and CL.db.gargulAsked and CL.db.masterAnnounce and Gargul.Settings.values["AwardingLoot.awardMessagesEnabled"] == true,
     "Keep both changes nothing")
 check(ML.MaybeAskGargul() == false and not gb:IsShown(), "...and it is not asked again")
-SlashCmdList.CLEANLOOT("gargul")
-check(gb:IsShown(), "/cll gargul asks again whenever you want")
+ML.AskGargul(true)
+check(gb:IsShown(), "the master looter can ask again whenever he wants")
 gb:Hide()
 
 resetGargul()
@@ -425,8 +423,8 @@ resetGargul()
 Gargul = fakeGargul(true)
 CL.db.masterAnnounce = false
 check(not ML.MaybeAskGargul(), "our announcements off: nothing to ask")
-SlashCmdList.CLEANLOOT("gargul")
-check(sayMatches("nothing is announced twice") and not ML.GargulBox():IsShown(), "...and /cll gargul explains the state instead")
+ML.AskGargul(true)
+check(sayMatches("nothing is announced twice") and not ML.GargulBox():IsShown(), "...and asking again explains the state instead")
 resetGargul()
 Gargul = fakeGargul(true)
 masterParty = 2

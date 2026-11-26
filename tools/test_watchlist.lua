@@ -135,36 +135,13 @@ check(WL.Add(nil, "x") == false and WL.SetNote(99999, "n") == false and WL.Remov
     "unknown items and missing ids are refused")
 reset()
 
--- 9. Commands
-SlashCmdList.CLEANLOOT("watch |cffa335ee|Hitem:999::::::::|h[Some Idol]|h|r for the guild bank")
-check(WL.Entry(999) and WL.Entry(999).name == "Some Idol" and WL.Entry(999).note == "for the guild bank",
-    "/cll watch [link] <note> adds it with the note, name from the link")
-SlashCmdList.CLEANLOOT("watch 1000")
-check(WL.Entry(1000) and WL.Entry(1000).note == "", "/cll watch <id> works without a note")
-SlashCmdList.CLEANLOOT("watch item:1001 reminder text")
-check(WL.Entry(1001) and WL.Entry(1001).note == "reminder text", "/cll watch item:<id> <note> works too")
-SlashCmdList.CLEANLOOT("watch note 1000 new note")
-check(WL.Entry(1000).note == "new note", "/cll watch note <id> <text> sets the note")
-SlashCmdList.CLEANLOOT("watch note |cffa335ee|Hitem:999::::::::|h[Some Idol]|h|r")
-check(WL.Entry(999).note == "", "/cll watch note [link] with no text clears it")
-said = {}
-SlashCmdList.CLEANLOOT("watch list")
-check(sayMatches("Some Idol") and sayMatches("new note") and sayMatches("item 1001"), "/cll watch list shows the items and notes")
-SlashCmdList.CLEANLOOT("watch remove |Hitem:999|h[Some Idol]|h")
-check(WL.Entry(999) == nil, "/cll watch remove [link] forgets it")
-said = {}
-SlashCmdList.CLEANLOOT("watch remove 424242")
-check(sayMatches("not on the watchlist"), "removing something unknown says so")
-said = {}
-SlashCmdList.CLEANLOOT("watch note 424242 hello")
-check(sayMatches("not on the watchlist"), "a note for something unknown says so")
-said = {}
-SlashCmdList.CLEANLOOT("watch not an item")
-check(sayMatches("/cll watch") and WL.Entry(0) == nil, "something that is not an item adds nothing and shows the usage")
-CL.Options.window:Hide()
-check(pcall(SlashCmdList.CLEANLOOT, "watch") and CL.Options.window:IsShown() and CL.Options.CurrentPage() == "watch",
-    "/cll watch opens the watchlist page")
-CL.Options.window:Hide()
+-- 9. Reading an item and its note from a pasted line
+local word, text = WL.SplitItem("|cffa335ee|Hitem:999::::::::|h[Some Idol]|h|r for the guild bank")
+check(WL.ItemID(word) == 999 and text == "for the guild bank", "a link then a note: the item and the note are split")
+word, text = WL.SplitItem("1000")
+check(WL.ItemID(word) == 1000 and text == "", "a bare id has no note")
+word, text = WL.SplitItem("item:1001 reminder text")
+check(WL.ItemID(word) == 1001 and text == "reminder text", "item:<id> then a note works too")
 local link, note = WL.SplitItem("|cnIQ3:|Hitem:5::::::::|h[A Name With Spaces]|h|r and a note")
 check(link:find("A Name With Spaces", 1, true) and note == "and a note", "SplitItem keeps a link with spaces whole")
 reset()
@@ -287,12 +264,6 @@ CL.RollFrames.StopAll()
 CL.Sim.Clear()
 CL.Sim.Start(3)
 check(RF.ActiveCount() == 3, "with the highlight off /cll sim still gives three drops")
-said = {}
-SlashCmdList.CLEANLOOT("watch item:3001")
-check(sayMatches("the highlight is switched off"), "adding an item while the highlight is off says so")
-reset()
-SlashCmdList.CLEANLOOT("watch item:3002")
-check(not sayMatches("switched off"), "...and says nothing of the kind while it is on")
 reset()
 
 print = realPrint

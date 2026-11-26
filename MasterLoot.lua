@@ -35,7 +35,7 @@ local METHODS = { [0] = "freeforall", [1] = "roundrobin", [2] = "master", [3] = 
     [4] = "needbeforegreed", [5] = "personalloot" }
 
 -------------------------------------------------
--- The switch: the whole master-loot part can be turned off (Options > General, /cll master)
+-- The switch: the whole master-loot part can be turned off (Options > General)
 -------------------------------------------------
 function ML.Enabled()
     return not (CL.db and CL.db.masterEnabled == false)
@@ -676,7 +676,7 @@ local function CreateGargulBox()
     end)
     f.mine = Choice("Turn off CleanLoot's master loot features", -128, function()
         ML.SetEnabled(false)
-        CL.Print("CleanLoot's master loot features are off (Gargul does the job). Back on: Options > General, or /cll master on.")
+        CL.Print("CleanLoot's master loot features are off (Gargul does the job). Back on: Options > General.")
     end)
     f.theirs = Choice("Turn off Gargul's award messages", -158, function()
         local g = GargulObject()
@@ -689,7 +689,7 @@ local function CreateGargulBox()
     end)
     f.note = f:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
     f.note:SetPoint("BOTTOM", f, "BOTTOM", 0, 10)
-    f.note:SetText("Ask again later with /cll gargul.")
+    f.note:SetText("Ask again later: Options > Master loot.")
 
     if type(UISpecialFrames) == "table" then table.insert(UISpecialFrames, "CleanLootGargulChoice") end
     f:Hide()
@@ -698,7 +698,7 @@ end
 
 function ML.GargulBox() return gargulBox end
 
--- `force` (/cll gargul, the options button): ask even when it was answered before.
+-- `force` (the options button): ask even when it was answered before.
 function ML.AskGargul(force)
     if ML.GargulAnnounces() == nil then
         if force then CL.Print("Gargul is not installed (or not loaded).") end
@@ -769,10 +769,10 @@ function ML.OnDropUpdate(key)
     end
 end
 
--- /cll sim master: a result window with a made-up group, to see it and try the click.
+-- A result window with a made-up group, to see it and try the click.
 function ML.Simulate()
     if not ML.Enabled() then
-        CL.Print("the master loot features are off: turn them on in Options > General, or /cll master on.")
+        CL.Print("the master loot features are off: turn them on in Options > General.")
         return nil
     end
     local players = {

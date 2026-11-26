@@ -755,21 +755,3 @@ end
 function Session.Toggle()
     if win and win:IsShown() then win:Hide() else Session.Open() end
 end
-
--- /cll session [start | test | stop]
-function Session.Command(arg)
-    arg = (arg or ""):lower()
-    if arg == "start" then
-        Session.Open()
-        Run().Start()
-        Refresh()
-    elseif arg == "test" then
-        Session.Open()
-        Run().StartTest()
-        Refresh()
-    elseif arg == "stop" or arg == "cancel" then
-        if not Run().Cancel() then CL.Print("no session is running.") end
-    else
-        Session.Toggle()
-    end
-end

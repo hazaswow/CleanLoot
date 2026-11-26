@@ -20,7 +20,7 @@ local nextID = 900001
 local rolls = {}  -- rollID -> simulated roll
 
 -- The other players in the simulated group (you are not counted); resized with
--- /cll sim group <n> to test a 5-man, a 10-man raid, a 25-man...
+-- A group size of 5, 10, 25... to test a 5-man, a 10-man raid, a 25-man...
 local NAME_POOL = { "Aludra", "Baric", "Cyndra", "Dorun", "Eluned", "Farrow", "Galen", "Hestia",
     "Isolde", "Jarek", "Kestrel", "Lyra", "Marrow", "Nerys", "Orin", "Pyria", "Quill", "Rowan",
     "Sable", "Tamsin" }

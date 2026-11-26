@@ -54,7 +54,7 @@ Stop clicking the same answer on the same items. **Nothing is automatic until yo
 
 Keep a list of the items you are hunting. When one drops, its roll frame gets a **gently pulsing cyan outline**, and the **note** you wrote for it (*BiS for my mage*) shows on the frame and in the icon's tooltip.
 
-- Add an item by shift-clicking it into the box, pasting its link, or typing its id. Or with `/cll watch [item] [note]`.
+- Add an item by shift-clicking it into the box, pasting its link, or typing its id.
 - It only draws the eye: nothing is answered for you. (That is auto-roll, and both can apply to the same item.)
 
 ## Options window

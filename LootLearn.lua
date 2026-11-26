@@ -178,38 +178,3 @@ frame:SetScript("OnEvent", function(_, event, a, b, c, d, e)
         if not ok and CL.db and CL.db.debug then CL.Print("learn: " .. tostring(err)) end
     end
 end)
-
--------------------------------------------------
--- /cll learned [text | clear]
--------------------------------------------------
-function Learn.Command(arg)
-    arg = (arg or ""):match("^%s*(.-)%s*$")
-    if arg:lower() == "clear" then
-        CL.db.learned = {}
-        wipe(counted)
-        CL.Print("what CleanLoot had learned about the bosses is erased.")
-        return
-    end
-    local bosses = Learn.Find(arg)
-    if #bosses == 0 then
-        CL.Print(arg == "" and "nothing learned yet: kill a boss and loot it in a group." or ("no boss matches '" .. arg .. "'."))
-        return
-    end
-    if arg == "" or #bosses > 1 then
-        local itemsTotal = 0
-        for _, b in ipairs(bosses) do itemsTotal = itemsTotal + b.items end
-        CL.Print(("%d boss%s, %d different items. /cll learned <name> for the details."):format(
-            #bosses, #bosses > 1 and "es" or "", itemsTotal))
-        for i, b in ipairs(bosses) do
-            if i > 25 then CL.Print("  ...") break end
-            CL.Print(("  %s - %s: %d kill%s, %d item%s"):format(b.iname, b.name, b.kills, b.kills == 1 and "" or "s",
-                b.items, b.items == 1 and "" or "s"))
-        end
-        return
-    end
-    local b = bosses[1]
-    CL.Print(("%s - %s: %d kill%s"):format(b.iname, b.name, b.kills, b.kills == 1 and "" or "s"))
-    for _, it in ipairs(Learn.Items(b.encounterID)) do
-        CL.Print(("  %s  %d/%d"):format(it.link, it.drops, it.kills))
-    end
-end

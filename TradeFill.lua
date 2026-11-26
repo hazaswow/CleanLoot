@@ -117,7 +117,7 @@ function TF.Fill(name)
     local list = TF.Pending(name)
     if #list == 0 then return 0 end
     if CursorHasItem and CursorHasItem() then
-        Print("you are holding an item: put it down, then /cll trade fills the window.")
+        Print("you are holding an item: put it down, then open the trade again.")
         return 0
     end
 
@@ -210,19 +210,5 @@ events:SetScript("OnEvent", function(_, event)
         if last.partner then C_Timer.After(DONE_WAIT, TF.FollowUp) end
     end
 end)
-
--- /cll trade
-function TF.Command()
-    if not open then
-        Print("open a trade window first: /cll trade puts the items the other player won in it.")
-        return
-    end
-    local name = TF.Partner()
-    if not name or #TF.Pending(name) == 0 then
-        Print(("nothing to hand over to %s."):format(name or "this player"))
-        return
-    end
-    TF.Fill(name)
-end
 
 TF.IsOpen = function() return open end
