@@ -96,6 +96,17 @@ function W.Columns(e)
     return kind, value, WhoText(w)
 end
 
+-- Ctrl-click: the item on the character (the dressing room); Shift-click: its link in the chat.
+local function Preview(link)
+    local fn = DressUpLink or DressUpItemLink
+    if fn then fn(link) end
+end
+
+local function InsertLink(link)
+    local fn = (ChatFrameUtil and ChatFrameUtil.InsertLink) or ChatEdit_InsertLink
+    if fn then fn(link) end
+end
+
 local function Age(t)
     local d = (GetServerTime and GetServerTime() or time()) - (t or 0)
     if d < 60 then return "now" end
@@ -133,7 +144,7 @@ local function Tooltip(owner, e)
     if e.me and e.me.type then
         GameTooltip:AddLine("You: " .. (RollText(e.me) or "-"), 0.25, 1, 0.25)
     end
-    GameTooltip:AddLine("Click: show or hide who rolled", 0.5, 0.5, 0.5)
+    GameTooltip:AddLine("Click: who rolled   Ctrl: preview   Shift: link", 0.5, 0.5, 0.5)
     GameTooltip:Show()
 end
 
@@ -467,8 +478,10 @@ local function Create()
         row:SetScript("OnClick", function(self)
             local e = self.entry
             if not e then return end
-            if e.link and IsModifiedClick and IsModifiedClick("CHATLINK") and ChatEdit_InsertLink then
-                ChatEdit_InsertLink(e.link)
+            if e.link and IsControlKeyDown() then
+                Preview(e.link)
+            elseif e.link and IsShiftKeyDown() then
+                InsertLink(e.link)
             else
                 state.open[e.id] = not state.open[e.id] or nil
                 Refresh()

@@ -233,9 +233,9 @@ local tip = table.concat(GameTooltip.lines, "\n")
 check(tip:find("Hall of Thanes", 1, true) and tip:find("Faldrim Anvilmar", 1, true), "the tooltip says where it dropped")
 
 -- opening an item shows the players who rolled
-local linked
-function IsModifiedClick(what) return what == "CHATLINK" and WOW.shift or false end
-function ChatEdit_InsertLink(l) linked = l end
+local linked, previewed
+ChatFrameUtil.InsertLink = function(l) linked = l end
+function DressUpLink(l) previewed = l end
 local function subLines()
     local t = {}
     for _, rr in ipairs(w.listRows) do
@@ -257,6 +257,10 @@ WOW.shift = true
 r.__scripts.OnClick(r)
 WOW.shift = false
 check(linked == r.entry.link and #subLines() == 0, "shift-click links the item and does not open it")
+WOW.ctrl = true
+r.__scripts.OnClick(r)
+WOW.ctrl = false
+check(previewed == r.entry.link and #subLines() == 0, "ctrl-click shows the item's look in the dressing room and does not open it")
 r.__scripts.OnClick(r)
 r.__scripts.OnClick(r)
 check(#subLines() == 0, "a second click closes it")
