@@ -219,6 +219,7 @@ local pending   -- the hand-out the game has not confirmed yet: { win, entry, sl
 local function Done(win, entry)
     win.given = entry.name
     win.givenTo = entry
+    if not win.simulated and CL.LootLog then pcall(CL.LootLog.Hand, win.res, entry) end
     ML.Refresh(win)
     local short = entry.name:match("^([^%-]+)") or entry.name
     local message = ("[CleanLoot] %s given to %s for roll %s"):format(ChatLink(win.res), short, RollWord(entry))

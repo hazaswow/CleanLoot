@@ -54,6 +54,7 @@ Clean loot roll frames for **WoW Forever** (the official Blizzard beta client). 
 | `/cll take` | Master looter: give yourself every master-loot item of the open loot window, to hand out later |
 | `/cll session start` / `test` / `stop` | Master looter: start a timed loot session / try one with made-up players (nothing is sent) / cancel it |
 | `/cll session` | Master looter: the items of your bags you can still hand out, with a box to leave each one out |
+| `/loot` / `/cll history` | The record of who won what, by instance and boss (replaces the game's Loot Rolls window) |
 | `/cll learned` / `<boss>` / `clear` | What the bosses you killed dropped, as CleanLoot saw it (kills and items, kept on your account) |
 | `/cll trade` | Put in the open trade window the items its player won |
 | `/cll de` / `ask` / `<name>` / `clear` | The disenchanter: open the window / ask the group who can disenchant / designate by name / forget him |

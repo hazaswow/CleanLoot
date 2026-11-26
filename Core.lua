@@ -34,6 +34,9 @@ local DEFAULTS = {
     deKeyword = "de",  -- the short word enchanters answer "who can disenchant?" with
     deKeep = false,  -- the disenchanter keeps the materials (off: he trades them back to the master looter)
     sessionDEAuto = true,  -- items nobody rolls for go to the designated disenchanter
+    historyRecord = true,  -- keep a record of who won what (the /loot window)
+    historyReplace = true,  -- /loot opens CleanLoot's window and the game's Loot Rolls window is put away
+    historyKeep = 300,  -- how many drops the record keeps
     learnLoot = true,  -- write down which boss drops what (kills and items, from the game's loot history)
     tradeFill = true,  -- when a winner is in the trade window with you, his items are put in it
     tradeNext = true,  -- more items than the six trade slots: open the next trade by itself
@@ -145,6 +148,11 @@ function API.ForgetRoll(rollID)
         encounterByKey[key] = nil
     end
     keyByRoll[rollID] = nil
+end
+
+-- The encounter a drop belongs to (known once GetResult/FindDrop has looked it up).
+function API.EncounterForKey(lootKey)
+    return encounterByKey[Plain(lootKey)]
 end
 
 -- The roll a LOOT_HISTORY_UPDATE_DROP lootListKey belongs to, if we show it.

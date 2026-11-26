@@ -758,6 +758,36 @@ local function BuildDisenchant(parent)
     return panel
 end
 
+-- The page of the loot record: who won what, shown by /loot.
+local function BuildHistory(parent)
+    local panel = CreateFrame("Frame", nil, parent)
+    panel.name = "Loot record"
+    Options.historyPanel = panel
+
+    Text(panel, "Loot record", 16, -16, "GameFontNormalLarge")
+    Text(panel, "Who won what, by instance and by boss. It replaces the game's Loot Rolls window.", 16, -44, "GameFontDisableSmall")
+    widgets.historyOpen = PushButton(panel, "Open the loot record", 20, -72, 200, function() CL.LootWindow.Open() end)
+    widgets.historyRecord = Checkbox(panel, "Keep a record of who won what", 16, -116,
+        function() return CL.db.historyRecord end,
+        function(v) CL.db.historyRecord = v end)
+    widgets.historyReplace = Checkbox(panel, "/loot opens this window instead of the game's", 16, -140,
+        function() return CL.db.historyReplace end,
+        function(v) CL.db.historyReplace = v if v then CL.LootWindow.GuardBlizzard() end end)
+    Text(panel, "On: the game's own Loot Rolls window no longer pops up on every drop.", 16, -170, "GameFontDisableSmall")
+    widgets.historyKeep = Slider(panel, "Drops kept", 16, -206, 100, 1000, 100, "%d",
+        function() return CL.LootLog.Keep() end,
+        function(v) CL.db.historyKeep = v end)
+    widgets.historyErase = PushButton(panel, "Erase the record", 20, -276, 200, function()
+        CL.MasterLoot.Confirmation("Erase the whole record of who won what?", "This cannot be undone.", function()
+            CL.LootLog.Clear()
+        end, "Erase")
+    end)
+    Text(panel, "/loot   /cll history", 16, -316, "GameFontDisableSmall")
+
+    panel:SetScript("OnShow", Options.Refresh)
+    return panel
+end
+
 -------------------------------------------------
 -- The window
 -------------------------------------------------
@@ -767,12 +797,13 @@ end
 local WINDOW_W, WINDOW_H = 680, 640
 
 local PAGES = {
-    { key = "general",    label = "General",         width = 90,  build = Build },
-    { key = "controller", label = "Controller mode", width = 130, build = BuildController },
-    { key = "auto",       label = "Auto-roll",       width = 90,  build = BuildAutoRoll },
-    { key = "watch",      label = "Watchlist",       width = 90,  build = BuildWatchlist },
-    { key = "master",      label = "Master loot",     width = 100, build = BuildMaster },
-    { key = "de",          label = "Disenchanter",    width = 100, build = BuildDisenchant },
+    { key = "general",    label = "General",         width = 76,  build = Build },
+    { key = "controller", label = "Controller mode", width = 118, build = BuildController },
+    { key = "auto",       label = "Auto-roll",       width = 78,  build = BuildAutoRoll },
+    { key = "watch",      label = "Watchlist",       width = 78,  build = BuildWatchlist },
+    { key = "master",      label = "Master loot",     width = 90, build = BuildMaster },
+    { key = "de",          label = "Disenchanter",    width = 94, build = BuildDisenchant },
+    { key = "history",     label = "Loot record",     width = 86,  build = BuildHistory },
 }
 Options.pages = {}   -- key -> { panel =, tab = }
 

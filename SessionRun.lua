@@ -479,6 +479,7 @@ function End(cancelled)
             end
         end
     end
+    if not state.test and CL.LootLog then pcall(CL.LootLog.Session, awards, LABEL) end
     Run.last = state
     state = nil
     runner:Hide()
