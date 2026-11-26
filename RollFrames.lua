@@ -639,7 +639,7 @@ function RF.RefreshWatch()
     RF.Layout()
 end
 
--- The skin changed (options, /cll skin): every frame, shown or not, is dressed again.
+-- The skin changed (options): every frame, shown or not, is dressed again.
 function RF.RefreshSkin()
     for _, f in ipairs(pool) do
         RF.ApplySkin(f)

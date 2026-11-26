@@ -110,17 +110,8 @@ check(f and f.buttons[1].auto, "the button of an auto-roll rule is marked")
 CL.db.autoItems = {}
 RF.StopAll()
 
--- 7. The command and the options
-said = {}
-SlashCmdList.CLEANLOOT("skin clean")
-check(RF.Skin() == "clean" and sayMatches("clean"), "/cll skin clean")
-SlashCmdList.CLEANLOOT("skin blizzard")
-check(RF.Skin() == "blizzard", "/cll skin blizzard")
-said = {}
-SlashCmdList.CLEANLOOT("skin")
-check(RF.Skin() == "blizzard" and sayMatches("blizzard"), "/cll skin alone tells the skin and changes nothing")
-SlashCmdList.CLEANLOOT("skin nonsense")
-check(RF.Skin() == "blizzard", "an unknown skin changes nothing")
+-- 7. The options
+CL.RollFrames.SetSkin("blizzard")
 
 local W = CL.Options.widgets
 check(W.skinClean and W.skinBlizzard, "the options page has both choices")
