@@ -248,33 +248,32 @@ local function Build(parent)
     widgets.scale = Slider(panel, "Frame scale", 16, -166, 0.8, 1.5, 0.05, "%.2f",
         function() return CL.db.frameScale or CL.DEFAULT_SCALE end,
         function(v) CL.db.frameScale = v CL.RollFrames.Layout() end)
-    widgets.native = Checkbox(panel, "Hide Blizzard's own roll frames", 16, -216,
+    Text(panel, "Skin", 16, -216)
+    widgets.skinClean = Checkbox(panel, "CleanLoot (flat and dark)", 16, -234,
+        function() return CL.RollFrames.Skin() == "clean" end,
+        function() CL.RollFrames.SetSkin("clean") Options.Refresh() end)
+    widgets.skinBlizzard = Checkbox(panel, "Classic (like the game's own frames)", 16, -258,
+        function() return CL.RollFrames.Skin() == "blizzard" end,
+        function() CL.RollFrames.SetSkin("blizzard") Options.Refresh() end)
+    widgets.native = Checkbox(panel, "Hide Blizzard's own roll frames", 16, -292,
         function() return CL.db.hideNative end,
         function(v) CL.Native.SetHidden(v) end)
-    widgets.chat = Checkbox(panel, "Hide roll messages from the chat (winners stay)", 16, -242,
+    widgets.chat = Checkbox(panel, "Hide roll messages from the chat (winners stay)", 16, -318,
         function() return CL.db.hideRollSpam end,
         function(v) CL.db.hideRollSpam = v end)
-    widgets.lock = Checkbox(panel, "Lock the frames' and popup's position", 16, -268,
+    widgets.lock = Checkbox(panel, "Lock the frames' and popup's position", 16, -344,
         function() return CL.db.locked end,
         function(v) CL.db.locked = v end)
-    widgets.autoConfirm = Checkbox(panel, "Auto-accept bind-on-pickup prompts", 16, -294,
+    widgets.autoConfirm = Checkbox(panel, "Auto-accept bind-on-pickup prompts", 16, -370,
         function() return CL.db.autoConfirm end,
         function(v) CL.db.autoConfirm = v end)
-    widgets.reset = PushButton(panel, "Reset position", 20, -326, 140, function()
+    widgets.reset = PushButton(panel, "Reset position", 20, -402, 140, function()
         CL.RollFrames.ResetPosition()
         CL.Results.ResetPosition()
     end)
 
-    Text(panel, "Roll frame skin", 16, -368, "GameFontNormalLarge")
-    widgets.skinClean = Checkbox(panel, "CleanLoot (flat and dark)", 16, -392,
-        function() return CL.RollFrames.Skin() == "clean" end,
-        function() CL.RollFrames.SetSkin("clean") Options.Refresh() end)
-    widgets.skinBlizzard = Checkbox(panel, "Classic (like the game's own frames)", 16, -416,
-        function() return CL.RollFrames.Skin() == "blizzard" end,
-        function() CL.RollFrames.SetSkin("blizzard") Options.Refresh() end)
-
-    Text(panel, "Minimap", 16, -452, "GameFontNormalLarge")
-    widgets.minimap = Checkbox(panel, "Hide the minimap button", 16, -476,
+    Text(panel, "Minimap", 16, -444, "GameFontNormalLarge")
+    widgets.minimap = Checkbox(panel, "Hide the minimap button", 16, -468,
         function() return CL.db.minimap and CL.db.minimap.hide end,
         function(v) CL.MinimapButton.SetHidden(v) end)
 
