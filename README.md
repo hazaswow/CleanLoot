@@ -39,31 +39,10 @@ Clean loot roll frames for **WoW Forever** (the official Blizzard beta client). 
 | Command | Effect |
 |---|---|
 | `/cll` | Open the options window (again: close it) |
-| `/cll controller` | Open the controller mode tab of the options window |
-| `/cll auto` | Open the auto-roll tab of the options window |
-| `/cll auto need` / `greed` / `pass` `[item]` | Always roll that way on an item (shift-click it into the chat line, or give its id) |
-| `/cll auto remove [item]` / `/cll auto list` | Forget an item's rule / list the rules |
-| `/cll watch` | Open the watchlist tab of the options window |
-| `/cll watch [item] [note]` | Highlight an item when it drops, with an optional note (shift-click it into the chat line, or give its id) |
-| `/cll watch note [item] <text>` / `remove [item]` / `list` | Change an item's note / forget it / list the watched items |
-| `/cll restore` | Bring back rolls still running (automatic at login and `/reload`) |
-| `/cll next` / `/cll previous` | Select the next or previous visible roll |
-| `/cll inspect` | Toggle the separate inspection tooltip |
-| `/cll need` / `/cll greed` / `/cll pass` | Roll on the selected item |
-| `/cll sim [n]` | Simulate *n* loot rolls (1-8) with a simulated group, to try the frames without a real drop. With a watchlist, the first drop is always one of the watched items |
-| `/cll sim colors` | One simulated drop of every item colour |
-| `/cll master [on\|off]` | Turn CleanLoot's master loot features on or off |
-| `/cll take` | Master looter: give yourself every master-loot item of the open loot window, to hand out later |
-| `/cll session start` / `test` / `stop` | Master looter: start a timed loot session / try one with made-up players (nothing is sent) / cancel it |
-| `/cll session` | Master looter: the items of your bags you can still hand out, with a box to leave each one out |
-| `/loot` / `/cll history` | The record of who won what, by instance and boss (replaces the game's Loot Rolls window) |
-| `/cll learned` / `<boss>` / `clear` | What the bosses you killed dropped, as CleanLoot saw it (kills and items, kept on your account) |
-| `/cll trade` | Put in the open trade window the items its player won |
-| `/cll de` / `ask` / `<name>` / `clear` | The disenchanter: open the window / ask the group who can disenchant / designate by name / forget him |
-| `/cll gargul` | With Gargul installed: choose who announces the hand-outs (both, CleanLoot only, or Gargul only) |
-| `/cll sim master` | A made-up master-loot roll result window, to look at it and try the click |
-| `/cll sim group <n>` | Size of the simulated group (1-39 other players) |
-| `/cll sim clear` | Remove the simulated rolls |
+| `/loot` | The record of who won what, by instance and boss (replaces the game's Loot Rolls window) |
+| `/cll session` | Master looter: your tradable items and the timed loot session |
+| `/cll sim [n]` | Simulate *n* loot rolls (1-8) with a simulated group, to try the frames without a real drop |
+| `/cll next` / `previous` / `inspect` / `need` / `greed` / `pass` | Controller mode: select a roll, inspect it, roll on it (for keys and macros) |
 | `/cll debug [on\|off]` | Trace every roll in chat (why one did or did not show) |
 
 ## Notes

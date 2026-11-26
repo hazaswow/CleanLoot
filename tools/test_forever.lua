@@ -926,8 +926,8 @@ CL.Options.window:Hide()
 WOW.chat = {}
 SlashCmdList["CLEANLOOT"]("help")
 local help = table.concat(WOW.chat, "\n")
-check(help:find("sim", 1, true) and help:find("debug", 1, true) and help:find("restore", 1, true),
-    "/cll help lists the sim, debug and restore commands")
+check(help:find("sim", 1, true) and help:find("debug", 1, true) and help:find("session", 1, true),
+    "/cll help lists the sim, debug and session commands")
 check(not help:find("grow", 1, true) and not help:find("toasts", 1, true) and not help:find("native", 1, true),
     "...and none of the settings that live in the options")
 local before = CL.db.growDirection
